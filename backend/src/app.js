@@ -22,4 +22,10 @@ app.use(express.urlencoded({ extended: true, limit: '16kb'}))
 app.use(express.static('public'));
 app.use(cookieParser());
 
+
+// Routes
+import authRouter from './routes/auth.routes.js'
+app.use('/api/auth', authRouter)
+
+
 export { app };
