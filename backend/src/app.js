@@ -35,5 +35,7 @@ app.use('/api/vendor', vendorRouter)
 
 import orderRouter from './routes/orders.routes.js'
 app.use('/api/orders', orderRouter)
+import ratingRouter from './routes/rating.routes.js'
+app.use('/api/rating', ratingRouter)
 
 export { app };
