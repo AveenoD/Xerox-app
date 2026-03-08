@@ -12,7 +12,7 @@ import { sendOtpEmail } from '../utils/mailer.js'
 import {Options} from '../utils/Options.js'
 
 
-const generateAccessTokenAndRefreshToken = async (userId) => {
+export const generateAccessTokenAndRefreshToken = async (userId) => {
     const user = await User.findById(userId)
     const accessToken = user.generateAccessToken()
     const refreshToken = user.generateRefreshToken()

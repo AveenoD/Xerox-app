@@ -22,7 +22,7 @@ const orderSchema = new Schema({
     },
     fileType: {
         type: String,
-        enum: ["pdf", "docs", "jpg", "png"],
+        enum: ["pdf",  "jpg", "png"],
         required: true
     },
     pageCount: {
@@ -50,10 +50,18 @@ const orderSchema = new Schema({
         }
 
     },
+    platformFee: {
+    type: Number,
+    default: 0  // Phase 1 mein zero
+},
     totalAmount: {
         type: Number,
         required: true
     },
+    pickupToken: {
+    type: String,
+    default: null
+},
     status: {
         type: String,
         enum: ["pending", "accepted",
@@ -79,7 +87,8 @@ const orderSchema = new Schema({
             type: String,
             default: null
         }
-    }
+    },
+    
 }, {timestamps: true})
 
 export const Order = mongoose.model("Order", orderSchema);

@@ -30,5 +30,10 @@ app.use('/api/auth', authRouter)
 import userRouter from './routes/user.routes.js'
 app.use('/api/user', userRouter)
 
+import vendorRouter from './routes/vendor.routes.js'
+app.use('/api/vendor', vendorRouter)
+
+import orderRouter from './routes/orders.routes.js'
+app.use('/api/orders', orderRouter)
 
 export { app };

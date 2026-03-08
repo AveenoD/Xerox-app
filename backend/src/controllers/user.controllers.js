@@ -46,6 +46,7 @@ return res
 
 
 })
+
 const updateUserAvatar = asyncHandler(async(req, res) => {
     const avatarLocalPath =  req.file?.path
     if(!avatarLocalPath)
@@ -73,6 +74,7 @@ const updateUserAvatar = asyncHandler(async(req, res) => {
     .status(200)
     .json(new ApiResponse(200, user, "Avatar Image updated successfylly"))
 })
+
 const changeCurrentPassword = asyncHandler(async(req, res) => {
     const {oldPassword, newPassword} = req.body
     const user = await User.findById(req.user?._id)
