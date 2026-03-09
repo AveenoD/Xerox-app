@@ -103,6 +103,12 @@ const getVendorById = asyncHandler(async(req, res) => {
     .json(new ApiResponse(200, vendor, "Vendor fetched successfully"))
 })
 
+const getMyVendorProfile = asyncHandler(async(req, res) => {
+    const vendor = await VendorProfile.findOne({ userId: req.user._id })
+    if(!vendor) throw new ApiError(404, "Vendor profile not found")
+    return res.status(200).json(new ApiResponse(200, vendor, "Vendor profile fetched"))
+})
+
 const updateVendor = asyncHandler(async(req, res) => {
 
     const { shopName, address, pincode, city, latitude, longitude } = req.body
@@ -173,9 +179,11 @@ const toggleStatus = asyncHandler(async (req, res) => {
             `Shop is now ${vendor.isOpen ? "Open" : "Closed"}`
         ))
 })
+
 export {
     registerVendor,
     getNearbyVendors,
+    getMyVendorProfile,
     getVendorById,
     updateVendor,
     updatePricing,

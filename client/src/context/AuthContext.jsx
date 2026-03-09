@@ -11,10 +11,13 @@ export const AuthProvider = ({ children }) => {
     useEffect(() => {
         const restoreSession = async () => {
             try {
-                const res = await api.get('/auth/refresh-token')
+                const res = await api.post('/auth/refresh-token')
                 window.__accessToken = res.data.data.accessToken
-                setUser(res.data.data.user)
-            } catch(err) {
+
+                // Token mile ke baad profile fetch karo
+                const profileRes = await api.get('/user/profile')
+                setUser(profileRes.data.data)
+            } catch (err) {
                 window.__accessToken = null
                 setUser(null)
             } finally {
@@ -32,7 +35,7 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         try {
             await api.post('/auth/logout')
-        } catch(err) {
+        } catch (err) {
             console.error(err)
         } finally {
             window.__accessToken = null
