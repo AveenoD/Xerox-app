@@ -13,11 +13,9 @@ export const AuthProvider = ({ children }) => {
             try {
                 const res = await api.post('/auth/refresh-token')
                 window.__accessToken = res.data.data.accessToken
-
-                // Token mile ke baad profile fetch karo
-                const profileRes = await api.get('/user/profile')
-                setUser(profileRes.data.data)
+                setUser(res.data.data.user)
             } catch (err) {
+                // 401 ya 500 dono pe — sirf null set karo
                 window.__accessToken = null
                 setUser(null)
             } finally {

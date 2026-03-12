@@ -17,6 +17,7 @@ import Dashboard from './pages/vendor/Dashboard.jsx'
 import Layout from './components/common/Layout.jsx'
 import BecomeVendor from './pages/vendor/BecomeVendor.jsx'
 import ManageShop from './pages/vendor/ManageShop.jsx'
+import Profile from './pages/shared/Profile.jsx'
 
 
 const router = createBrowserRouter([
@@ -36,6 +37,7 @@ const router = createBrowserRouter([
             { path: '/my-orders', element: <MyOrders /> },
             { path: '/order/:orderId', element: <OrderDetail /> },
            { path: '/become-vendor', element: <BecomeVendor /> },
+           { path: '/profile', element: <Profile /> },
         ]
     },
 

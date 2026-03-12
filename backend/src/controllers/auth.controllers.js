@@ -1,6 +1,6 @@
 import { User } from '../models/user.models.js';
-import {ApiError} from '../utils/ApiError.js';
-import {ApiResponse} from '../utils/ApiResponse.js';
+import { ApiError } from '../utils/ApiError.js';
+import { ApiResponse } from '../utils/ApiResponse.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import uploadOnCloudinary from '../utils/cloudinary.js';
 import bcrypt from 'bcrypt'
@@ -9,7 +9,7 @@ import { sendOtpSms } from '../utils/sms.js'
 import disposableEmailDomains from 'disposable-email-domains' with { type: 'json' }
 import { generateOTP } from '../utils/otpGenerator.js'
 import { sendOtpEmail } from '../utils/mailer.js'
-import {Options} from '../utils/Options.js'
+import { Options } from '../utils/Options.js'
 
 
 export const generateAccessTokenAndRefreshToken = async (userId) => {
@@ -88,11 +88,11 @@ const verifyEmailOtp = asyncHandler(async (req, res) => {
     const user = await User.findOne({
         email
     })
-    
-console.log("User found:", user?.email)
-console.log("emailOtpExpiry:", user?.emailOtpExpiry)
-console.log("current time:", new Date())
-console.log("isExpired:", user?.emailOtpExpiry < new Date())
+
+    console.log("User found:", user?.email)
+    console.log("emailOtpExpiry:", user?.emailOtpExpiry)
+    console.log("current time:", new Date())
+    console.log("isExpired:", user?.emailOtpExpiry < new Date())
     if (!user) {
         throw new ApiError(404, "User not found")
     }
@@ -200,42 +200,47 @@ const logoutUser = asyncHandler(async (req, res) => {
         .clearCookie("refreshToken", Options)
         .json(new ApiResponse(200, {}, "User logged out successfully"))
 })
-const refreshAccessToken = asyncHandler(async (req, res) => {
-    const incommingRefreshToken = req.cookies.refreshToken || req.body.refreshToken
 
-    if (!incommingRefreshToken) {
+const refreshAccessToken = asyncHandler(async (req, res) => {
+    const incomingRefreshToken = req.cookies?.refreshToken
+        || req.body.refreshToken
+    console.log("COOKIES:", req.cookies) // ← yeh add kar
+    console.log("BODY:", req.body)
+
+    if (!incomingRefreshToken) {
         throw new ApiError(401, "Unauthorized request")
     }
 
-    const decodedToken = jwt.verify(
-        incommingRefreshToken,
-        process.env.REFRESH_TOKEN_SECRET
-    )
+    let decodedToken
+    try {
+        decodedToken = jwt.verify(
+            incomingRefreshToken,
+            process.env.REFRESH_TOKEN_SECRET
+        )
+    } catch (err) {
+        throw new ApiError(401, "Invalid or expired refresh token")
+    }
 
     const user = await User.findById(decodedToken?._id)
+    if (!user) throw new ApiError(401, "Invalid refresh token")
 
-    if (!user) {
-        throw new ApiError(401, "Invalid refresh token")
+    if (incomingRefreshToken !== user?.refreshToken) {
+        throw new ApiError(401, "Refresh token is expired or used")
     }
 
-    if (incommingRefreshToken !== user?.refreshToken) {
-        throw new ApiError(401, "Refresh token is expired or used");
-    }
+    const { accessToken, refreshToken: newRefreshToken } =
+        await generateAccessTokenAndRefreshToken(user._id)
 
-    const { accessToken, refreshToken: newRefreshToken } = await generateAccessTokenAndRefreshToken(user?._id)
+    const updatedUser = await User.findById(user._id)
+        .select("-password -refreshToken")
 
     return res
         .status(200)
         .cookie("refreshToken", newRefreshToken, Options)
-        .json(
-            new ApiResponse(
-                200,
-                {
-                    accessToken
-                },
-                "Access Token refreshed"
-            )
-        )
+        .json(new ApiResponse(200, {
+            accessToken,
+            user: updatedUser
+        }, "Access token refreshed"))
 })
 
 const sendphoneOtp = asyncHandler(async (req, res) => {

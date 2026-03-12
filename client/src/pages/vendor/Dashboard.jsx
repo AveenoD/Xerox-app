@@ -1,22 +1,15 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-    Package, Clock, Printer,
-    CheckCircle, XCircle, ToggleLeft,
-    ToggleRight, Settings, LogOut,
-    ChevronRight
+    Package, Clock, Printer, CheckCircle,
+    XCircle, ToggleLeft, ToggleRight,
+    Settings, LogOut, TrendingUp
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext.jsx'
-import api from '../../utils/axios.js'
+import StatusBadge from '../../components/common/StatusBadge.jsx'
 import Loader from '../../components/common/Loader.jsx'
-
-const STATUS_CONFIG = {
-    pending:   { label: 'Pending',   color: '#EAB308', bg: '#2D2500', icon: Clock },
-    accepted:  { label: 'Accepted',  color: '#3B82F6', bg: '#0D1B2B', icon: Package },
-    printing:  { label: 'Printing',  color: '#8B5CF6', bg: '#1A0D2B', icon: Printer },
-    completed: { label: 'Completed', color: '#10B981', bg: '#0D2B1F', icon: CheckCircle },
-    rejected:  { label: 'Rejected',  color: '#EF4444', bg: '#2D1515', icon: XCircle },
-}
+import usePolling from '../../hooks/usePolling.js'
+import api from '../../utils/axios.js'
 
 const NEXT_STATUS = {
     pending:  'accepted',
@@ -42,10 +35,6 @@ const Dashboard = () => {
     const { user, logout } = useAuth()
     const navigate = useNavigate()
 
-    useEffect(() => {
-        fetchDashboard()
-    }, [])
-
     const fetchDashboard = async () => {
         try {
             const [vendorRes, ordersRes] = await Promise.all([
@@ -65,6 +54,13 @@ const Dashboard = () => {
         }
     }
 
+    useEffect(() => {
+        fetchDashboard()
+    }, [])
+
+    // Auto refresh every 20 seconds
+    usePolling(fetchDashboard, 20000, !loading)
+
     const toggleShopStatus = async () => {
         setTogglingStatus(true)
         try {
@@ -77,15 +73,87 @@ const Dashboard = () => {
         }
     }
 
+    // Helper to clean Cloudinary URL
+    const getCleanUrl = (url) => {
+        if (!url) return '#'
+        return url
+            .replace('/fl_inline/', '/')
+            .replace('fl_inline,', '')
+            .replace(',fl_inline', '')
+    }
+
+    // Fetch PDF with auth and open print dialog
+    const openPrintDialog = async (order) => {
+        try {
+            const cleanUrl = getCleanUrl(order.fileUrl)
+            
+            // Fetch the file with auth token
+            const response = await api.get(cleanUrl, {
+                responseType: 'blob'
+            })
+            
+            // Create blob URL
+            const blob = new Blob([response.data], { type: 'application/pdf' })
+            const blobUrl = URL.createObjectURL(blob)
+            
+            // Open in new window
+            const printWindow = window.open(blobUrl, '_blank')
+            
+            if (printWindow) {
+                // Wait for PDF to load then print
+                printWindow.addEventListener('load', () => {
+                    setTimeout(() => {
+                        printWindow.print()
+                        // Clean up after printing
+                        setTimeout(() => {
+                            URL.revokeObjectURL(blobUrl)
+                        }, 1000)
+                    }, 1000)
+                })
+                
+                // Fallback timeout
+                setTimeout(() => {
+                    printWindow.print()
+                    URL.revokeObjectURL(blobUrl)
+                }, 2000)
+            }
+        } catch (err) {
+            console.error('Failed to open print dialog:', err)
+            setError('Could not open PDF for printing')
+        }
+    }
+
     const updateStatus = async (orderId, status) => {
         setUpdatingOrder(orderId)
         try {
-            const res = await api.patch(`/orders/${orderId}/status`, { status })
+            await api.patch(`/orders/${orderId}/status`, { status })
             setOrders(prev => prev.map(o =>
                 o._id === orderId ? { ...o, status } : o
             ))
         } catch(err) {
             setError('Could not update order status')
+        } finally {
+            setUpdatingOrder(null)
+        }
+    }
+
+    // Special handler for "Mark Printing" - updates status AND opens print dialog
+    const handleMarkPrinting = async (order) => {
+        setUpdatingOrder(order._id)
+        try {
+            // First update the status
+            await api.patch(`/orders/${order._id}/status`, { status: 'printing' })
+            
+            // Update local state
+            setOrders(prev => prev.map(o =>
+                o._id === order._id ? { ...o, status: 'printing' } : o
+            ))
+            
+            // Then open print dialog
+            await openPrintDialog(order)
+            
+        } catch(err) {
+            setError('Could not update order status or open PDF')
         } finally {
             setUpdatingOrder(null)
         }
@@ -105,21 +173,24 @@ const Dashboard = () => {
         }
     }
 
-    // Filter orders by tab
     const activeOrders = orders.filter(o =>
         ['pending', 'accepted', 'printing'].includes(o.status)
     )
     const completedOrders = orders.filter(o =>
         ['completed', 'rejected'].includes(o.status)
     )
-    const displayOrders = activeTab === 'active' ? activeOrders : completedOrders
+    const displayOrders = activeTab === 'active'
+        ? activeOrders : completedOrders
 
-    if(loading) return (
-       <Loader />
-    )
+    // Revenue calculation
+    const totalRevenue = orders
+        .filter(o => o.status === 'completed')
+        .reduce((sum, o) => sum + o.totalAmount, 0)
+
+    if(loading) return <Loader />
 
     return (
-        <div className="min-h-screen pb-10"
+        <div className="min-h-screen pb-24"
             style={{ backgroundColor: '#0F1117' }}>
 
             {/* Header */}
@@ -130,7 +201,7 @@ const Dashboard = () => {
                     <div>
                         <h1 className="text-base font-bold"
                             style={{ color: '#F1F5F9' }}>
-                            Vendor Dashboard
+                            Dashboard
                         </h1>
                         <p className="text-xs"
                             style={{ color: '#64748B' }}>
@@ -139,19 +210,21 @@ const Dashboard = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        {/* Manage Shop */}
                         <button
                             onClick={() => navigate('/manage-shop')}
-                            className="w-9 h-9 rounded-xl flex items-center justify-center"
+                            className="w-9 h-9 rounded-xl flex items-center 
+                                       justify-center"
                             style={{ backgroundColor: '#1A1D27',
                                      border: '1px solid #2E3148' }}>
                             <Settings size={16} color="#94A3B8" />
                         </button>
-
-                        {/* Logout */}
                         <button
-                            onClick={logout}
-                            className="w-9 h-9 rounded-xl flex items-center justify-center"
+                            onClick={async () => {
+                                await logout()
+                                navigate('/login')
+                            }}
+                            className="w-9 h-9 rounded-xl flex items-center 
+                                       justify-center"
                             style={{ backgroundColor: '#1A1D27',
                                      border: '1px solid #2E3148' }}>
                             <LogOut size={16} color="#94A3B8" />
@@ -172,7 +245,7 @@ const Dashboard = () => {
                     </div>
                 )}
 
-                {/* Shop Status Card */}
+                {/* Shop Status Toggle */}
                 {vendor && (
                     <div className="p-4 rounded-2xl flex items-center justify-between"
                         style={{ backgroundColor: '#1A1D27',
@@ -183,13 +256,13 @@ const Dashboard = () => {
                                 Shop Status
                             </p>
                             <p className="text-xs mt-0.5"
-                                style={{ color: vendor.isOpen ? '#10B981' : '#EF4444' }}>
+                                style={{ color: vendor.isOpen
+                                    ? '#10B981' : '#EF4444' }}>
                                 {vendor.isOpen
-                                    ? 'Your shop is visible to customers'
-                                    : 'Your shop is hidden from customers'}
+                                    ? 'Visible to customers'
+                                    : 'Hidden from customers'}
                             </p>
                         </div>
-
                         <button
                             onClick={toggleShopStatus}
                             disabled={togglingStatus}>
@@ -202,31 +275,60 @@ const Dashboard = () => {
                 )}
 
                 {/* Stats Row */}
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-2">
                     {[
-                        { label: 'Active', value: activeOrders.length, color: '#3B82F6' },
-                        { label: 'Completed', value: completedOrders.filter(o => o.status === 'completed').length, color: '#10B981' },
-                        { label: 'Total', value: orders.length, color: '#94A3B8' },
-                    ].map((stat, i) => (
-                        <div key={i} className="p-3 rounded-2xl text-center"
-                            style={{ backgroundColor: '#1A1D27',
-                                     border: '1px solid #2E3148' }}>
-                            <p className="text-2xl font-bold"
-                                style={{ color: stat.color }}>
-                                {stat.value}
-                            </p>
-                            <p className="text-xs mt-0.5"
-                                style={{ color: '#64748B' }}>
-                                {stat.label}
-                            </p>
-                        </div>
-                    ))}
+                        {
+                            label: 'Active',
+                            value: activeOrders.length,
+                            color: '#3B82F6',
+                            icon: Clock
+                        },
+                        {
+                            label: 'Completed',
+                            value: completedOrders.filter(
+                                o => o.status === 'completed'
+                            ).length,
+                            color: '#10B981',
+                            icon: CheckCircle
+                        },
+                        {
+                            label: 'Total',
+                            value: orders.length,
+                            color: '#94A3B8',
+                            icon: Package
+                        },
+                        {
+                            label: 'Revenue',
+                            value: `₹${totalRevenue}`,
+                            color: '#10B981',
+                            icon: TrendingUp
+                        },
+                    ].map((stat, i) => {
+                        const Icon = stat.icon
+                        return (
+                            <div key={i}
+                                className="p-3 rounded-2xl text-center"
+                                style={{ backgroundColor: '#1A1D27',
+                                         border: '1px solid #2E3148' }}>
+                                <Icon size={16} color={stat.color}
+                                    className="mx-auto mb-1" />
+                                <p className="text-lg font-bold"
+                                    style={{ color: stat.color }}>
+                                    {stat.value}
+                                </p>
+                                <p className="text-xs"
+                                    style={{ color: '#64748B' }}>
+                                    {stat.label}
+                                </p>
+                            </div>
+                        )
+                    })}
                 </div>
 
                 {/* Tabs */}
                 <div className="flex gap-2">
                     {[
-                        { key: 'active', label: `Active (${activeOrders.length})` },
+                        { key: 'active',  label: `Active (${activeOrders.length})` },
                         { key: 'history', label: `History (${completedOrders.length})` }
                     ].map(tab => (
                         <button
@@ -249,7 +351,8 @@ const Dashboard = () => {
 
                 {/* Orders List */}
                 {displayOrders.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16">
+                    <div className="flex flex-col items-center 
+                                    justify-center py-16">
                         <Package size={40} color="#2E3148" className="mb-3" />
                         <p className="text-sm font-medium"
                             style={{ color: '#F1F5F9' }}>
@@ -267,8 +370,6 @@ const Dashboard = () => {
                 ) : (
                     <div className="space-y-3">
                         {displayOrders.map(order => {
-                            const status = STATUS_CONFIG[order.status]
-                            const StatusIcon = status.icon
                             const nextStatus = NEXT_STATUS[order.status]
                             const isUpdating = updatingOrder === order._id
 
@@ -281,69 +382,61 @@ const Dashboard = () => {
                                     {/* Top Row */}
                                     <div className="flex items-center 
                                                     justify-between mb-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-bold 
-                                                             font-mono"
-                                                style={{ color: '#10B981' }}>
-                                                #{order.pickupToken}
-                                            </span>
-                                            <div className="flex items-center gap-1 
-                                                            px-2 py-0.5 rounded-full"
-                                                style={{ backgroundColor: status.bg }}>
-                                                <StatusIcon size={10}
-                                                    color={status.color} />
-                                                <span className="text-xs"
-                                                    style={{ color: status.color }}>
-                                                    {status.label}
-                                                </span>
-                                            </div>
-                                        </div>
-                                        <span className="text-xs"
-                                            style={{ color: '#64748B' }}>
-                                            {new Date(order.createdAt)
-                                                .toLocaleDateString('en-IN', {
-                                                    day: 'numeric',
-                                                    month: 'short'
-                                                })}
+                                        <span className="text-sm font-bold 
+                                                         font-mono"
+                                            style={{ color: '#10B981' }}>
+                                            #{order.pickupToken}
                                         </span>
+                                        <StatusBadge
+                                            status={order.status}
+                                            size="sm"
+                                        />
                                     </div>
 
                                     {/* File Name */}
-                                    <p className="text-sm font-medium truncate mb-2"
+                                    <p className="text-sm font-medium 
+                                                  truncate mb-2"
                                         style={{ color: '#F1F5F9' }}>
                                         {order.fileName}
                                     </p>
 
-                                    {/* Print Config Tags */}
-                                    <div className="flex items-center gap-2 mb-3">
+                                    {/* Tags */}
+                                    <div className="flex items-center 
+                                                    gap-2 mb-3">
                                         {[
                                             order.printConfig?.paperSize,
                                             `${order.pageCount} pages`,
                                             `${order.printConfig?.copies} ${order.printConfig?.copies > 1 ? 'copies' : 'copy'}`,
                                         ].map((tag, i) => (
                                             <span key={i}
-                                                className="text-xs px-2 py-1 rounded-lg"
-                                                style={{ backgroundColor: '#222536',
-                                                         color: '#94A3B8' }}>
+                                                className="text-xs px-2 py-1 
+                                                           rounded-lg"
+                                                style={{
+                                                    backgroundColor: '#222536',
+                                                    color: '#94A3B8'
+                                                }}>
                                                 {tag}
                                             </span>
                                         ))}
-                                        <span className="ml-auto text-sm font-bold"
+                                        <span className="ml-auto text-sm 
+                                                         font-bold"
                                             style={{ color: '#10B981' }}>
                                             ₹{order.totalAmount}
                                         </span>
                                     </div>
 
-                                    {/* Action Buttons — only active orders */}
+                                    {/* Action Buttons */}
                                     {nextStatus && (
                                         <div className="flex gap-2">
-                                            {/* Reject — only pending */}
                                             {order.status === 'pending' && (
                                                 <button
-                                                    onClick={() => rejectOrder(order._id)}
+                                                    onClick={() => rejectOrder(
+                                                        order._id
+                                                    )}
                                                     disabled={isUpdating}
-                                                    className="flex-1 py-2.5 rounded-xl 
-                                                               text-sm font-medium"
+                                                    className="flex-1 py-2.5 
+                                                               rounded-xl text-sm 
+                                                               font-medium"
                                                     style={{
                                                         backgroundColor: '#2D1515',
                                                         color: '#EF4444',
@@ -353,15 +446,16 @@ const Dashboard = () => {
                                                     Reject
                                                 </button>
                                             )}
-
-                                            {/* Next Status */}
                                             <button
-                                                onClick={() => updateStatus(
-                                                    order._id, nextStatus
-                                                )}
+                                                onClick={() => 
+                                                    order.status === 'accepted'
+                                                        ? handleMarkPrinting(order)
+                                                        : updateStatus(order._id, nextStatus)
+                                                }
                                                 disabled={isUpdating}
-                                                className="flex-1 py-2.5 rounded-xl 
-                                                           text-sm font-semibold"
+                                                className="flex-1 py-2.5 
+                                                           rounded-xl text-sm 
+                                                           font-semibold"
                                                 style={{
                                                     backgroundColor: '#10B981',
                                                     color: '#ffffff',
@@ -379,7 +473,6 @@ const Dashboard = () => {
                         })}
                     </div>
                 )}
-
             </div>
         </div>
     )

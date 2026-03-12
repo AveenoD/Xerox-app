@@ -1,5 +1,5 @@
 export const Options = {
     httpOnly: true,
-    secure: true,
-    sameSite: "strict"
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax'
 }

@@ -18,4 +18,7 @@ connectDB()
     app.listen(PORT, () => {
        console.log(`🚀 Server running on http://localhost:${PORT}`);
     });
+    console.log('🔐 REFRESH_TOKEN_SECRET:', process.env.REFRESH_TOKEN_SECRET ? '✅ Loaded' : '❌ Missing')
+console.log('🔐 ACCESS_TOKEN_SECRET:', process.env.ACCESS_TOKEN_SECRET ? '✅ Loaded' : '❌ Missing')
+console.log('🗄️  MONGODB_URI:', process.env.MONGODB_URI ? '✅ Loaded' : '❌ Missing')
 })
