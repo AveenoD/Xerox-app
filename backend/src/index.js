@@ -1,24 +1,27 @@
-import connectDB from "./database/index.js";
-import dotenv from "dotenv";
-import { app }from './app.js'
-import { fileURLToPath } from 'url';
-import { dirname, resolve } from 'path';
+import dotenv from 'dotenv'
+dotenv.config()
 
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-dotenv.config({ path: resolve(__dirname, './.env') });
-
+import connectDB from './database/index.js'
+import { app } from './app.js'
+import { startSLAChecker } from './utils/slaChecker.js'
+import { startFileExpiryCron } from './utils/fileExpiry.js'
+import { setupIndexes } from './utils/setupIndexes.js'
+import logger from './utils/logger.js'
 
 connectDB()
-.then(()=> {
-    console.log('✅ MongoDB connected');
-    const PORT = process.env.PORT || 8000;
+    .then(async () => {
+        // Setup indexes first
+        await setupIndexes()
 
-    app.listen(PORT, () => {
-       console.log(`🚀 Server running on http://localhost:${PORT}`);
-    });
-    console.log('🔐 REFRESH_TOKEN_SECRET:', process.env.REFRESH_TOKEN_SECRET ? '✅ Loaded' : '❌ Missing')
-console.log('🔐 ACCESS_TOKEN_SECRET:', process.env.ACCESS_TOKEN_SECRET ? '✅ Loaded' : '❌ Missing')
-console.log('🗄️  MONGODB_URI:', process.env.MONGODB_URI ? '✅ Loaded' : '❌ Missing')
-})
+        // Start cron jobs
+        startSLAChecker()
+        startFileExpiryCron()
+
+        app.listen(process.env.PORT || 5000, () => {
+            logger.info(`✅ Server running on http://localhost:${process.env.PORT || 5000}`)
+        })
+    })
+    .catch((err) => {
+        logger.error('DB connection failed:', err)
+        process.exit(1)
+    })

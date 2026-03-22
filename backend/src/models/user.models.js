@@ -1,7 +1,7 @@
 import mongoose, { Schema } from 'mongoose';
 import jwt from 'jsonwebtoken';
 import bcrypt from "bcrypt";
-
+import crypto from 'crypto'
 const userSchema = new Schema({
     fullName: {
         type: String,
@@ -42,10 +42,6 @@ const userSchema = new Schema({
         type: Boolean,
         default: false
     },
-    isPhoneVerified: {
-        type: Boolean,
-        default: false
-    },
     emailOtp: {
         type: String,
         default: null
@@ -70,6 +66,31 @@ const userSchema = new Schema({
         type: Date,
         default: null
     },
+    referralCode: {
+        type: String,
+        unique: true,
+        sparse: true
+    },
+    referredBy: {
+        type: String,
+        default: null
+    },
+
+    // Bonuses
+    signupBonusCredited: {
+        type: Boolean,
+        default: false
+    },
+    freePages: {
+        type: Number,
+        default: 50
+    },
+
+    // Phone verification (agar nahi hai toh)
+    isPhoneVerified: {
+        type: Boolean,
+        default: false
+    },
     vendorProfileId: {
         type: Schema.Types.ObjectId,
         ref: "VendorProfile",
@@ -81,11 +102,16 @@ const userSchema = new Schema({
     }
 }, { timestamps: true });
 
-userSchema.pre('save', async function () {
-    if (!this.isModified('password')) return;
-
-    this.password = await bcrypt.hash(this.password, 10);
-});
+userSchema.pre('save', async function (next) {
+    if (this.isModified('password')) {
+        this.password = await bcrypt.hash(this.password, 10)
+    }
+    // Referral code auto generate
+    if (!this.referralCode) {
+        this.referralCode = 'XC' + crypto.randomBytes(3)
+            .toString('hex').toUpperCase()
+    }
+})
 
 userSchema.methods.isPasswordCorrect = async function (password) {
     return await bcrypt.compare(password, this.password);

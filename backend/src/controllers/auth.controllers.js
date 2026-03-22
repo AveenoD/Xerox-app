@@ -10,7 +10,8 @@ import disposableEmailDomains from 'disposable-email-domains' with { type: 'json
 import { generateOTP } from '../utils/otpGenerator.js'
 import { sendOtpEmail } from '../utils/mailer.js'
 import { Options } from '../utils/Options.js'
-
+import { handleReferralOnSignup, creditSignupBonus, markRefereeSignupComplete } from './referral.controller.js'
+import crypto from 'crypto'
 
 export const generateAccessTokenAndRefreshToken = async (userId) => {
     const user = await User.findById(userId)
@@ -64,7 +65,11 @@ const registerUser = asyncHandler(async (req, res) => {
         password
     });
 
-
+    if (req.body.referredBy) {
+    await handleReferralOnSignup(user._id, req.body.referredBy)
+    user.referredBy = req.body.referredBy
+    await user.save({ validateBeforeSave: false })
+}
 
     const otp = generateOTP()
     const hashedOtp = await bcrypt.hash(otp, 10)
@@ -118,6 +123,10 @@ const verifyEmailOtp = asyncHandler(async (req, res) => {
     user.otpAttempts = 0
     user.otpLockUntil = null
     await user.save({ validateBeforeSave: false })
+    if (user.isEmailVerified && user.isPhoneVerified && !user.signupBonusCredited) {
+    await creditSignupBonus(user._id)
+    await markRefereeSignupComplete(user._id)
+}
     return res.status(200).json(
         new ApiResponse(200, {}, "Email verified successfully")
     )
@@ -304,6 +313,10 @@ const verifyPhoneOtp = asyncHandler(async (req, res) => {
     user.otpAttempts = 0
     user.otpLockUntil = null
     await user.save({ validateBeforeSave: false })
+    if (user.isEmailVerified && user.isPhoneVerified && !user.signupBonusCredited) {
+    await creditSignupBonus(user._id)
+    await markRefereeSignupComplete(user._id)
+}
     return res.status(200).json(
         new ApiResponse(200, {}, "Phone OTP verified successfully")
     )
