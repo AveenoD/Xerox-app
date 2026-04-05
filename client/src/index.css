@@ -1,4 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
+
+/* ============================================
+   XConnect Design System
+   Theme: Ultra-modern Dark Mode
+   ============================================ */
+
+:root {
+    /* Core Colors */
+    --bg-primary: #0F172A;           /* Deep Slate Blue/Black */
+    --bg-card: rgba(30, 41, 59, 0.7); /* Glassmorphism card bg */
+    --bg-card-solid: #1E293B;        /* Solid card background */
+    --border-color: rgba(51, 65, 85, 0.8); /* Slate-700 with opacity */
+    
+    /* Primary Colors */
+    --primary: #10B981;              /* Emerald Green */
+    --primary-light: #34D399;
+    --primary-dark: #059669;
+    --primary-glow: rgba(16, 185, 129, 0.3);
+    
+    /* Secondary Colors */
+    --secondary: #F59E0B;            /* Amber Gold for Pro */
+    --secondary-light: #FBBF24;
+    --secondary-glow: rgba(245, 158, 11, 0.3);
+    
+    /* Text Colors */
+    --text-primary: #F1F5F9;         /* Slate-50 */
+    --text-secondary: #94A3B8;       /* Slate-400 */
+    --text-muted: #64748B;           /* Slate-500 */
+    
+    /* Status Colors */
+    --success: #10B981;
+    --warning: #F59E0B;
+    --error: #EF4444;
+    --info: #3B82F6;
+    
+    /* Typography */
+    --font-body: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* Base Styles */
+* {
+    font-family: var(--font-body);
+}
+
+body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Typography Classes */
+.font-mono {
+    font-family: var(--font-mono);
+}
+
+/* Glassmorphism Card Style */
+.glass-card {
+    background: var(--bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 1rem;
+}
+
+.glass-nav {
+    background: rgba(30, 41, 59, 0.85);
+    backdrop-filter: blur(15px);
+    -webkit-backdrop-filter: blur(15px);
+    border-top: 1px solid var(--border-color);
+}
+
+/* Glow Effects */
+.glow-primary {
+    box-shadow: 0 0 20px var(--primary-glow);
+}
+
+.glow-secondary {
+    box-shadow: 0 0 20px var(--secondary-glow);
+}
+
+.text-glow-primary {
+    text-shadow: 0 0 10px var(--primary-glow);
+}
+
+/* Pulse Animation for Live Status */
+@keyframes pulse-glow {
+    0%, 100% {
+        box-shadow: 0 0 5px var(--primary-glow);
+    }
+    50% {
+        box-shadow: 0 0 20px var(--primary-glow), 0 0 30px var(--primary-glow);
+    }
+}
+
+.animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+}
+
+/* Shimmer Loading Effect */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.shimmer {
+    background: linear-gradient(
+        90deg,
+        rgba(30, 41, 59, 0.5) 25%,
+        rgba(51, 65, 85, 0.5) 50%,
+        rgba(30, 41, 59, 0.5) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
 
 /* Safe Area Insets for Mobile Devices */
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
@@ -7,7 +128,11 @@
     }
     
     .safe-area-pb {
-        padding-bottom: calc(72px + env(safe-area-inset-bottom));
+        padding-bottom: calc(80px + env(safe-area-inset-bottom));
+    }
+    
+    .safe-area-pt {
+        padding-top: env(safe-area-inset-top);
     }
 }
 
@@ -18,6 +143,83 @@
     }
     
     .safe-area-pb {
-        padding-bottom: 72px;
+        padding-bottom: 80px;
     }
+    
+    .safe-area-pt {
+        padding-top: 0;
+    }
+}
+
+/* Scrollbar Styling */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--text-muted);
+}
+
+/* Touch Action for Mobile */
+.touch-manipulation {
+    touch-action: manipulation;
+}
+
+/* Prevent text selection on interactive elements */
+.no-select {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Focus styles for accessibility */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+}
+
+/* Smooth transitions */
+.transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Bottom sheet animation */
+@keyframes slide-up {
+    from {
+        transform: translateY(100%);
+    }
+    to {
+        transform: translateY(0);
+    }
+}
+
+.animate-slide-up {
+    animation: slide-up 0.3s ease-out;
+}
+
+/* Fade in animation */
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+.animate-fade-in {
+    animation: fade-in 0.2s ease-out;
 }

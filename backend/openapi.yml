@@ -36,6 +36,12 @@ tags:
     description: Order dispute resolution
   - name: Ratings
     description: Vendor rating and reviews
+  - name: Files
+    description: PDF upload, analysis, and auto-fix
+  - name: Vendor Plans
+    description: Vendor subscription plans and limits
+  - name: Admin
+    description: Admin dashboard and management
 
 paths:
   # ============================================
@@ -842,6 +848,481 @@ paths:
         400:
           description: Already rated this vendor
 
+  # ============================================
+  # Files (PDF Processing)
+  # ============================================
+  /files/upload:
+    post:
+      tags:
+        - Files
+      summary: Upload and analyze PDF
+      description: Upload PDF file for analysis to detect issues like landscape pages, blank pages, non-A4 sizes
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - document
+              properties:
+                document:
+                  type: string
+                  format: binary
+                  description: PDF file to analyze (max 50MB)
+      responses:
+        200:
+          description: PDF analyzed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totalPages:
+                    type: integer
+                  hasIssues:
+                    type: boolean
+                  issues:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        type:
+                          type: string
+                          enum: [landscape, blank, nonA4]
+                        page:
+                          type: integer
+                        description:
+                          type: string
+        400:
+          description: Invalid file type or size
+
+  /files/fix:
+    post:
+      tags:
+        - Files
+      summary: Fix PDF issues
+      description: Auto-fix detected PDF issues (rotate landscape, remove blank pages, normalize to A4)
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: PDF fixed successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fixed:
+                    type: boolean
+                  path:
+                    type: string
+                  size:
+                    type: integer
+        400:
+          description: No file to fix or file expired
+
+  # ============================================
+  # Vendor Plans
+  # ============================================
+  /vendor-plans/me:
+    get:
+      tags:
+        - Vendor Plans
+      summary: Get my vendor plan
+      description: Get current vendor subscription plan details
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Vendor plan retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  plan:
+                    type: string
+                    enum: [starter, growth, pro]
+                  ordersUsedThisMonth:
+                    type: integer
+                  ordersLimit:
+                    type: integer
+                  isActive:
+                    type: boolean
+
+  /vendor-plans/upgrade:
+    post:
+      tags:
+        - Vendor Plans
+      summary: Upgrade vendor plan
+      description: Upgrade to a higher tier plan
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - plan
+              properties:
+                plan:
+                  type: string
+                  enum: [starter, growth, pro]
+      responses:
+        200:
+          description: Plan upgraded successfully
+        402:
+          description: Payment required
+
+  # ============================================
+  # Admin
+  # ============================================
+  /admin/dashboard-stats:
+    get:
+      tags:
+        - Admin
+      summary: Get dashboard statistics
+      description: Get comprehensive admin dashboard stats including totals, charts, and recent activity
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Dashboard stats retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  totals:
+                    type: object
+                    properties:
+                      users:
+                        type: integer
+                      vendors:
+                        type: integer
+                      orders:
+                        type: integer
+                      disputes:
+                        type: integer
+                  planDistribution:
+                    type: object
+                  dailyOrders:
+                    type: array
+                  orderStatusDistribution:
+                    type: object
+                  recentDisputes:
+                    type: array
+
+  /admin/users:
+    get:
+      tags:
+        - Admin
+      summary: Get all users
+      description: Get paginated list of all users with search
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: Users list retrieved
+
+  /admin/vendors:
+    get:
+      tags:
+        - Admin
+      summary: Get all vendors
+      description: Get paginated list of all vendors with search
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: Vendors list retrieved
+
+  /admin/orders:
+    get:
+      tags:
+        - Admin
+      summary: Get all orders
+      description: Get paginated list of all orders with search and status filter
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: Orders list retrieved
+
+  /admin/disputes:
+    get:
+      tags:
+        - Admin
+      summary: Get all disputes
+      description: Get paginated list of all disputes
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+      responses:
+        200:
+          description: Disputes list retrieved
+
+  /admin/disputes/{disputeId}/resolve:
+    patch:
+      tags:
+        - Admin
+      summary: Resolve dispute
+      description: Resolve a dispute in favor of customer or vendor
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: disputeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - resolution
+              properties:
+                resolution:
+                  type: string
+                  enum: [customer_favor, vendor_favor]
+                resolutionNote:
+                  type: string
+      responses:
+        200:
+          description: Dispute resolved successfully
+
+  /admin/coupons:
+    get:
+      tags:
+        - Admin
+      summary: Get all coupons
+      description: Get paginated list of all promo coupons
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        200:
+          description: Coupons list retrieved
+    
+    post:
+      tags:
+        - Admin
+      summary: Create coupon
+      description: Create a new promo coupon
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - code
+                - discountValue
+                - expiresAt
+              properties:
+                code:
+                  type: string
+                discountValue:
+                  type: number
+                minOrder:
+                  type: number
+                  default: 0
+                expiresAt:
+                  type: string
+                  format: date-time
+                maxUses:
+                  type: integer
+      responses:
+        201:
+          description: Coupon created successfully
+
+  /admin/broadcast:
+    post:
+      tags:
+        - Admin
+      summary: Broadcast notification
+      description: Send FCM notification to all vendors, customers, or everyone
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - target
+                - title
+                - body
+              properties:
+                target:
+                  type: string
+                  enum: [vendors, customers, all]
+                title:
+                  type: string
+                  maxLength: 100
+                body:
+                  type: string
+                  maxLength: 500
+                data:
+                  type: object
+      responses:
+        200:
+          description: Notification broadcast successfully
+
+  # ── Earnings ─────────────────────────────────────────
+  /earnings/dashboard:
+    get:
+      tags:
+        - Earnings
+      summary: Get earnings dashboard
+      description: Get comprehensive earnings statistics for vendor
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Earnings dashboard retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EarningsDashboard'
+
+  /earnings/by-date:
+    get:
+      tags:
+        - Earnings
+      summary: Get earnings by date range
+      description: Get earnings breakdown for a specific date range
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: startDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+        - name: endDate
+          in: query
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        200:
+          description: Earnings by date range retrieved
+
+  /earnings/payout:
+    post:
+      tags:
+        - Earnings
+      summary: Request payout
+      description: Request earnings payout to UPI
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - upiId
+              properties:
+                amount:
+                  type: number
+                  minimum: 100
+                upiId:
+                  type: string
+                  pattern: '^[a-zA-Z0-9.\-_]{2,256}@[a-zA-Z][a-zA-Z]{2,64}$'
+      responses:
+        200:
+          description: Payout request submitted
+
 components:
   securitySchemes:
     bearerAuth:
@@ -986,7 +1467,7 @@ components:
           type: string
         status:
           type: string
-          enum: [pending, accepted, printing, completed, rejected]
+          enum: [pending, accepted, printing, completed, rejected, cancelled]
         payment:
           type: object
           properties:
@@ -1033,3 +1514,73 @@ components:
           type: array
           items:
             type: string
+
+    EarningsDashboard:
+      type: object
+      properties:
+        today:
+          type: object
+          properties:
+            earnings:
+              type: number
+            orders:
+              type: integer
+        thisWeek:
+          type: object
+          properties:
+            earnings:
+              type: number
+            orders:
+              type: integer
+        thisMonth:
+          type: object
+          properties:
+            earnings:
+              type: number
+            orders:
+              type: integer
+        allTime:
+          type: object
+          properties:
+            earnings:
+              type: number
+            orders:
+              type: integer
+        dailyBreakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              _id:
+                type: string
+              earnings:
+                type: number
+              orders:
+                type: integer
+        orderStats:
+          type: object
+          properties:
+            pending:
+              type: integer
+            accepted:
+              type: integer
+            printing:
+              type: integer
+            completed:
+              type: integer
+            rejected:
+              type: integer
+            cancelled:
+              type: integer
+        recentOrders:
+          type: array
+          items:
+            type: object
+            properties:
+              pickupToken:
+                type: string
+              totalAmount:
+                type: number
+              updatedAt:
+                type: string
+                format: date-time

@@ -1,4 +1,4 @@
-import { StrictMode, lazy, Suspense } from 'react'
+import { StrictMode, lazy, Suspense, useEffect } from 'react'
 import { createRoot } from 'react-dom/client'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import './index.css'
@@ -16,6 +16,10 @@ import ManageShop from './pages/vendor/ManageShop.jsx'
 import Profile from './pages/shared/Profile.jsx'
 import AdminDashboard from './pages/admin/AdminDashboard.jsx'
 import AdminNotify from './pages/admin/AdminNotify.jsx'
+import PDFUpload from './pages/customer/PDFUpload.jsx'
+import OrderTracker from './pages/customer/OrderTracker.jsx'
+import Earnings from './pages/vendor/Earnings.jsx'
+import { registerSW } from './utils/pwa.js'
 
 // Lazy load heavy components
 const Dashboard = lazy(() => import('./pages/vendor/Dashboard.jsx'))
@@ -58,6 +62,8 @@ const router = createBrowserRouter([
                     { path: '/wallet', element: <Suspense fallback={<PageLoader />}><Wallet /></Suspense> },
                     { path: '/referral', element: <Suspense fallback={<PageLoader />}><Referral /></Suspense> },
                     { path: '/disputes', element: <Suspense fallback={<PageLoader />}><Dispute /></Suspense> },
+                    { path: '/upload/:vendorId', element: <PDFUpload /> },
+                    { path: '/track/:orderId', element: <OrderTracker /> },
                 ]
             },
             {
@@ -65,6 +71,7 @@ const router = createBrowserRouter([
                 children: [
                     { path: '/dashboard', element: <Suspense fallback={<PageLoader />}><Dashboard /></Suspense> },
                     { path: '/manage-shop', element: <ManageShop /> },
+                    { path: '/earnings', element: <Earnings /> },
                 ]
             },
             {
@@ -77,6 +84,9 @@ const router = createBrowserRouter([
         ]
     }
 ])
+// Register Service Worker for PWA
+registerSW()
+
 createRoot(document.getElementById('root')).render(
      <StrictMode>
         <AuthProvider>

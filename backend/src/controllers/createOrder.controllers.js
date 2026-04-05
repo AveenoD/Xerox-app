@@ -224,7 +224,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
         if (order.status !== 'pending') {
             throw new ApiError(400, "Order can only be cancelled while pending")
         }
-        if (status !== 'rejected') {
+        if (status !== 'cancelled') {
             throw new ApiError(400, "Customers can only cancel orders")
         }
 
@@ -250,7 +250,7 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
             )
         }
 
-        order.status = 'rejected'
+        order.status = 'cancelled'
         order.cancelReason = cancelReason || 'customer_cancelled'
         await order.save()
 

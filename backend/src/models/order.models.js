@@ -65,8 +65,12 @@ const orderSchema = new Schema({
     status: {
         type: String,
         enum: ["pending", "accepted",
-            "printing", "completed", "rejected"],
+            "printing", "completed", "rejected", "cancelled"],
         default: "pending"
+    },
+    cancelReason: {
+        type: String,
+        default: null
     },
     payment:{
         method:{

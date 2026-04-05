@@ -89,6 +89,9 @@ app.use('/api/vendor-plans', vendorPlanRouter)
 import adminRouter from './routes/admin.routes.js'
 app.use('/api/admin', adminRouter)
 
+import earningsRouter from './routes/earnings.routes.js'
+app.use('/api/earnings', earningsRouter)
+
 // Swagger API Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
     explorer: true,

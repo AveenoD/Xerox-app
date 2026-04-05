@@ -6,6 +6,7 @@ const STATUS_CONFIG = {
     printing:  { label: 'Printing',  color: '#8B5CF6', bg: '#1A0D2B', icon: Printer },
     completed: { label: 'Completed', color: '#10B981', bg: '#0D2B1F', icon: CheckCircle },
     rejected:  { label: 'Rejected',  color: '#EF4444', bg: '#2D1515', icon: XCircle },
+    cancelled: { label: 'Cancelled', color: '#64748B', bg: '#1E293B', icon: XCircle },
 }
 
 const StatusBadge = ({ status, size = 'md' }) => {
