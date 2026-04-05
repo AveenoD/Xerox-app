@@ -42,6 +42,8 @@ tags:
     description: Vendor subscription plans and limits
   - name: Admin
     description: Admin dashboard and management
+  - name: Earnings
+    description: Vendor earnings dashboard and payout management
 
 paths:
   # ============================================
@@ -672,7 +674,10 @@ paths:
       tags:
         - Orders
       summary: Update order status
-      description: Update order status (vendor only) or cancel (customer)
+      description: |
+        Update order status. 
+        - **Vendors**: Can update to accepted, printing, completed, rejected
+        - **Customers**: Can only cancel (set status to 'cancelled') while order is pending
       security:
         - bearerAuth: []
       parameters:
@@ -692,7 +697,7 @@ paths:
               properties:
                 status:
                   type: string
-                  enum: [accepted, printing, completed, rejected]
+                  enum: [accepted, printing, completed, rejected, cancelled]
                 cancelReason:
                   type: string
       responses:
@@ -849,14 +854,17 @@ paths:
           description: Already rated this vendor
 
   # ============================================
-  # Files (PDF Processing)
+  # Files (PDF & Image Processing)
   # ============================================
   /files/upload:
     post:
       tags:
         - Files
-      summary: Upload and analyze PDF
-      description: Upload PDF file for analysis to detect issues like landscape pages, blank pages, non-A4 sizes
+      summary: Upload and analyze file
+      description: |
+        Upload PDF or image file for analysis.
+        - **PDF**: Detects landscape pages, blank pages, non-A4 sizes
+        - **Images**: JPG, PNG, WEBP supported (auto-converted for printing)
       security:
         - bearerAuth: []
       requestBody:
@@ -871,7 +879,7 @@ paths:
                 document:
                   type: string
                   format: binary
-                  description: PDF file to analyze (max 50MB)
+                  description: PDF or image file (max 10MB). Supported formats PDF, JPG, PNG, WEBP
       responses:
         200:
           description: PDF analyzed successfully
@@ -1440,6 +1448,8 @@ components:
           type: string
         fileType:
           type: string
+          enum: [pdf, jpg, png]
+          description: File type - pdf for documents, jpg/png for images
         pageCount:
           type: integer
         printConfig:
@@ -1468,6 +1478,9 @@ components:
         status:
           type: string
           enum: [pending, accepted, printing, completed, rejected, cancelled]
+        cancelReason:
+          type: string
+          description: Reason for cancellation (set when status is 'cancelled' or 'rejected')
         payment:
           type: object
           properties:
