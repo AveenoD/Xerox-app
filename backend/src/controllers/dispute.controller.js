@@ -1,8 +1,8 @@
 import asyncHandler from '../utils/asyncHandler.js'
 import { ApiError } from '../utils/ApiError.js'
 import { ApiResponse } from '../utils/ApiResponse.js'
-import { Dispute } from '../models/dispute.model.js'
-import { Order } from '../models/order.model.js'
+import { Dispute } from '../models/dispute.models.js'
+import { Order } from '../models/order.models.js'
 
 // ── File a dispute ────────────────────────────────────
 export const fileDispute = asyncHandler(async (req, res) => {

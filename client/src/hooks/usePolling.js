@@ -1,16 +1,27 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 
 const usePolling = (callback, interval = 15000, enabled = true) => {
     const savedCallback = useRef(callback)
+    const [isVisible, setIsVisible] = useState(!document.hidden)
 
     useEffect(() => {
         savedCallback.current = callback
     }, [callback])
 
+    // Track page visibility
     useEffect(() => {
-        if(!enabled) return
+        const handleVisibilityChange = () => {
+            setIsVisible(!document.hidden)
+        }
 
-        // Immediately call once
+        document.addEventListener('visibilitychange', handleVisibilityChange)
+        return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }, [])
+
+    useEffect(() => {
+        if (!enabled || !isVisible) return
+
+        // Immediately call once when becoming visible
         savedCallback.current()
 
         const timer = setInterval(() => {
@@ -18,7 +29,7 @@ const usePolling = (callback, interval = 15000, enabled = true) => {
         }, interval)
 
         return () => clearInterval(timer)
-    }, [interval, enabled])
+    }, [interval, enabled, isVisible])
 }
 
 export default usePolling

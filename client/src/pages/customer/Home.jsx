@@ -4,6 +4,7 @@ import { MapPin, Search, RefreshCw, SlidersHorizontal } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import VendorCard from './VendorCard.jsx'
 import Loader from '../../components/common/Loader.jsx'
+import { VendorCardSkeleton } from '../../components/common/Skeleton.jsx'
 import api from '../../utils/axios.js'
 
 const Home = () => {
@@ -69,10 +70,50 @@ const Home = () => {
         return matchesSearch && matchesStatus
     })
 
-    if(loading) return <Loader />
+    // Show skeleton loaders during initial load
+    if (loading) {
+        return (
+            <div className="min-h-screen safe-area-pb"
+                style={{ backgroundColor: '#0F1117' }}>
+                {/* Header Skeleton */}
+                <div className="sticky top-0 z-10 px-4 py-4"
+                    style={{ backgroundColor: '#0F1117',
+                             borderBottom: '1px solid #2E3148' }}>
+                    <div className="max-w-lg mx-auto">
+                        <div className="flex items-center justify-between mb-3">
+                            <div>
+                                <div className="w-24 h-4 rounded mb-1"
+                                    style={{ backgroundColor: '#2E3148' }} />
+                                <div className="w-32 h-6 rounded"
+                                    style={{ backgroundColor: '#2E3148' }} />
+                            </div>
+                            <div className="w-9 h-9 rounded-full"
+                                style={{ backgroundColor: '#2E3148' }} />
+                        </div>
+                        <div className="h-10 rounded-xl mb-2"
+                            style={{ backgroundColor: '#2E3148' }} />
+                        <div className="flex gap-2">
+                            <div className="w-16 h-8 rounded-xl"
+                                style={{ backgroundColor: '#2E3148' }} />
+                            <div className="w-16 h-8 rounded-xl"
+                                style={{ backgroundColor: '#2E3148' }} />
+                            <div className="w-16 h-8 rounded-xl"
+                                style={{ backgroundColor: '#2E3148' }} />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                        <VendorCardSkeleton key={i} />
+                    ))}
+                </div>
+            </div>
+        )
+    }
 
     return (
-        <div className="min-h-screen pb-24"
+        <div className="min-h-screen safe-area-pb"
             style={{ backgroundColor: '#0F1117' }}>
 
             {/* Header */}

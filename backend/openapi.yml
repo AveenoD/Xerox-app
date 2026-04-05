@@ -1,0 +1,1035 @@
+openapi: 3.0.0
+info:
+  title: XConnect API
+  description: |
+    XConnect - Hyperlocal Print Marketplace API
+    
+    A platform connecting customers with nearby print shops for document printing services.
+  version: 1.0.0
+  contact:
+    name: XConnect Support
+    email: support@xconnect.app
+  license:
+    name: ISC
+    url: https://opensource.org/licenses/ISC
+
+servers:
+  - url: http://localhost:5000/api
+    description: Local development server
+  - url: https://api.xconnect.app/api
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User registration, login, and token management
+  - name: Users
+    description: User profile management
+  - name: Vendors
+    description: Print shop vendor management
+  - name: Orders
+    description: Order creation and lifecycle management
+  - name: Wallet
+    description: User wallet and transaction management
+  - name: Referrals
+    description: Referral program management
+  - name: Disputes
+    description: Order dispute resolution
+  - name: Ratings
+    description: Vendor rating and reviews
+
+paths:
+  # ============================================
+  # Authentication
+  # ============================================
+  /auth/register:
+    post:
+      tags:
+        - Authentication
+      summary: Register a new user
+      description: Create a new customer account with optional avatar upload
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - fullName
+                - email
+                - phone
+                - password
+              properties:
+                fullName:
+                  type: string
+                  example: "John Doe"
+                email:
+                  type: string
+                  format: email
+                  example: "john@example.com"
+                phone:
+                  type: string
+                  pattern: '^[6-9]\d{9}$'
+                  example: "9876543210"
+                password:
+                  type: string
+                  format: password
+                  minLength: 6
+                  example: "password123"
+                avatar:
+                  type: string
+                  format: binary
+                  description: Optional profile photo
+                referredBy:
+                  type: string
+                  description: Referral code of the referrer
+      responses:
+        201:
+          description: User registered successfully, OTP sent
+        400:
+          description: Validation error or user already exists
+        429:
+          description: Too many requests
+
+  /auth/verify-email-otp:
+    post:
+      tags:
+        - Authentication
+      summary: Verify email OTP
+      description: Verify the OTP sent to user's email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - otp
+              properties:
+                email:
+                  type: string
+                  format: email
+                otp:
+                  type: string
+                  pattern: '^\d{6}$'
+                  example: "123456"
+      responses:
+        200:
+          description: Email verified successfully
+        400:
+          description: Invalid or expired OTP
+        429:
+          description: Too many attempts
+
+  /auth/resend-email-otp:
+    post:
+      tags:
+        - Authentication
+      summary: Resend email OTP
+      description: Request a new OTP for email verification
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        200:
+          description: New OTP sent successfully
+        429:
+          description: Please wait before requesting new OTP
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate user with email/phone and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                phone:
+                  type: string
+                password:
+                  type: string
+                  format: password
+      responses:
+        200:
+          description: Login successful, returns access token and user data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+                  accessToken:
+                    type: string
+        401:
+          description: Invalid credentials
+        403:
+          description: Email not verified
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Logout user and clear refresh token
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Logout successful
+        401:
+          description: Unauthorized
+
+  /auth/refresh-token:
+    post:
+      tags:
+        - Authentication
+      summary: Refresh access token
+      description: Get new access token using refresh token from cookie
+      responses:
+        200:
+          description: New access token issued
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  user:
+                    $ref: '#/components/schemas/User'
+        401:
+          description: Invalid or expired refresh token
+
+  /auth/send-phone-otp:
+    post:
+      tags:
+        - Authentication
+      summary: Send phone OTP
+      description: Send OTP to user's phone number
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+              properties:
+                phone:
+                  type: string
+                  pattern: '^[6-9]\d{9}$'
+      responses:
+        200:
+          description: OTP sent successfully
+        409:
+          description: Phone number already in use
+
+  /auth/verify-phone-otp:
+    post:
+      tags:
+        - Authentication
+      summary: Verify phone OTP
+      description: Verify the OTP sent to user's phone
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - phone
+                - otp
+              properties:
+                phone:
+                  type: string
+                otp:
+                  type: string
+      responses:
+        200:
+          description: Phone verified successfully
+        400:
+          description: Invalid OTP
+
+  # ============================================
+  # Users
+  # ============================================
+  /user/profile:
+    get:
+      tags:
+        - Users
+      summary: Get user profile
+      description: Get current user's profile information
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: User profile retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  /user/profile-update:
+    put:
+      tags:
+        - Users
+      summary: Update user profile
+      description: Update user's full name and phone number
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                fullName:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        200:
+          description: Profile updated successfully
+
+  /user/profile/avatar-update:
+    put:
+      tags:
+        - Users
+      summary: Update user avatar
+      description: Upload new profile photo
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - avatar
+              properties:
+                avatar:
+                  type: string
+                  format: binary
+      responses:
+        200:
+          description: Avatar updated successfully
+
+  /user/profile/password-update:
+    put:
+      tags:
+        - Users
+      summary: Change password
+      description: Change user's current password
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - oldPassword
+                - newPassword
+              properties:
+                oldPassword:
+                  type: string
+                  format: password
+                newPassword:
+                  type: string
+                  format: password
+                  minLength: 6
+      responses:
+        200:
+          description: Password changed successfully
+        400:
+          description: Invalid old password
+
+  # ============================================
+  # Vendors
+  # ============================================
+  /vendor/register-vendor:
+    post:
+      tags:
+        - Vendors
+      summary: Register as vendor
+      description: Convert customer account to vendor account
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - shopName
+                - address
+                - pincode
+                - city
+                - latitude
+                - longitude
+              properties:
+                shopName:
+                  type: string
+                address:
+                  type: string
+                pincode:
+                  type: string
+                city:
+                  type: string
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+                shopPhoto:
+                  type: string
+                  format: binary
+      responses:
+        201:
+          description: Vendor registered successfully
+        400:
+          description: Already registered as vendor
+
+  /vendor/nearby-vendor:
+    get:
+      tags:
+        - Vendors
+      summary: Get nearby vendors
+      description: Find print shops near user's location
+      parameters:
+        - name: latitude
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: longitude
+          in: query
+          required: true
+          schema:
+            type: number
+        - name: maxDistance
+          in: query
+          schema:
+            type: integer
+            default: 5000
+            description: Maximum distance in meters
+      responses:
+        200:
+          description: List of nearby vendors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Vendor'
+
+  /vendor/{vendorId}:
+    get:
+      tags:
+        - Vendors
+      summary: Get vendor by ID
+      description: Get detailed information about a specific vendor
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Vendor details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+        404:
+          description: Vendor not found
+
+  /vendor/profile/me:
+    get:
+      tags:
+        - Vendors
+      summary: Get my vendor profile
+      description: Get current vendor's profile
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Vendor profile retrieved
+
+  /vendor/profile/update:
+    put:
+      tags:
+        - Vendors
+      summary: Update vendor profile
+      description: Update shop information
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                shopName:
+                  type: string
+                address:
+                  type: string
+                pincode:
+                  type: string
+                city:
+                  type: string
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+                shopPhoto:
+                  type: string
+                  format: binary
+      responses:
+        200:
+          description: Profile updated successfully
+
+  /vendor/update-pricing:
+    put:
+      tags:
+        - Vendors
+      summary: Update pricing
+      description: Update print pricing for different paper sizes and types
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pricing:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/PricingItem'
+      responses:
+        200:
+          description: Pricing updated successfully
+
+  /vendor/toggle-status:
+    patch:
+      tags:
+        - Vendors
+      summary: Toggle shop status
+      description: Open or close the shop
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Shop status toggled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  isOpen:
+                    type: boolean
+
+  # ============================================
+  # Orders
+  # ============================================
+  /orders/create:
+    post:
+      tags:
+        - Orders
+      summary: Create order
+      description: Place a new print order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - vendorId
+                - document
+                - pageCount
+                - paymentMethod
+                - printConfig
+              properties:
+                vendorId:
+                  type: string
+                document:
+                  type: string
+                  format: binary
+                  description: PDF or image file
+                pageCount:
+                  type: integer
+                  minimum: 1
+                paymentMethod:
+                  type: string
+                  enum: [cash, upi]
+                printConfig:
+                  type: string
+                  description: JSON string with paperSize, printType, copies
+                useWallet:
+                  type: boolean
+                  default: false
+      responses:
+        201:
+          description: Order created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/my-orders:
+    get:
+      tags:
+        - Orders
+      summary: Get my orders
+      description: Get all orders placed by current user
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Order'
+
+  /orders/vendor-orders:
+    get:
+      tags:
+        - Orders
+      summary: Get vendor orders
+      description: Get all orders for vendor's shop
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: List of orders
+
+  /orders/{orderId}:
+    get:
+      tags:
+        - Orders
+      summary: Get order by ID
+      description: Get detailed order information
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        200:
+          description: Order details retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{orderId}/status:
+    patch:
+      tags:
+        - Orders
+      summary: Update order status
+      description: Update order status (vendor only) or cancel (customer)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - status
+              properties:
+                status:
+                  type: string
+                  enum: [accepted, printing, completed, rejected]
+                cancelReason:
+                  type: string
+      responses:
+        200:
+          description: Status updated successfully
+
+  # ============================================
+  # Wallet
+  # ============================================
+  /wallet/me:
+    get:
+      tags:
+        - Wallet
+      summary: Get wallet
+      description: Get user's wallet balance and transactions
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Wallet data retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  promotionalBalance:
+                    type: number
+                  refundedBalance:
+                    type: number
+                  totalBalance:
+                    type: number
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+
+  # ============================================
+  # Referrals
+  # ============================================
+  /referral/me:
+    get:
+      tags:
+        - Referrals
+      summary: Get my referral info
+      description: Get referral code and referral statistics
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: Referral data retrieved
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  referralCode:
+                    type: string
+                  referralLink:
+                    type: string
+                  totalReferred:
+                    type: integer
+                  bonusEarned:
+                    type: integer
+                  pendingBonus:
+                    type: integer
+                  referrals:
+                    type: array
+
+  # ============================================
+  # Disputes
+  # ============================================
+  /dispute:
+    post:
+      tags:
+        - Disputes
+      summary: File a dispute
+      description: File a dispute for a completed order
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - orderId
+                - reason
+              properties:
+                orderId:
+                  type: string
+                reason:
+                  type: string
+                  enum: [wrong_print, missing_pages, quality_issue, wrong_copies, not_received, other]
+                description:
+                  type: string
+                  maxLength: 500
+      responses:
+        201:
+          description: Dispute filed successfully
+        400:
+          description: Dispute already exists or order not completed
+
+  /dispute/me:
+    get:
+      tags:
+        - Disputes
+      summary: Get my disputes
+      description: Get all disputes filed by current user
+      security:
+        - bearerAuth: []
+      responses:
+        200:
+          description: List of disputes
+
+  # ============================================
+  # Ratings
+  # ============================================
+  /rating/{vendorId}/rate:
+    post:
+      tags:
+        - Ratings
+      summary: Rate vendor
+      description: Rate a vendor after completing an order
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: vendorId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - score
+              properties:
+                score:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                review:
+                  type: string
+      responses:
+        200:
+          description: Rating submitted successfully
+        403:
+          description: Must complete an order before rating
+        400:
+          description: Already rated this vendor
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [customer, vendor]
+        avatar:
+          type: string
+        isEmailVerified:
+          type: boolean
+        isPhoneVerified:
+          type: boolean
+        referralCode:
+          type: string
+        freePages:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    Vendor:
+      type: object
+      properties:
+        _id:
+          type: string
+        userId:
+          type: string
+        shopName:
+          type: string
+        address:
+          type: string
+        pincode:
+          type: string
+        city:
+          type: string
+        location:
+          type: object
+          properties:
+            type:
+              type: string
+            coordinates:
+              type: array
+              items:
+                type: number
+        shopPhoto:
+          type: string
+        isOpen:
+          type: boolean
+        pricing:
+          type: array
+          items:
+            $ref: '#/components/schemas/PricingItem'
+        averageRating:
+          type: number
+        ratings:
+          type: array
+          items:
+            $ref: '#/components/schemas/Rating'
+
+    PricingItem:
+      type: object
+      properties:
+        paperSize:
+          type: string
+          enum: [A4, A3, Legal]
+        printType:
+          type: string
+          enum: [bw_single, bw_double, color_single, color_double]
+        pricePerPage:
+          type: number
+
+    Rating:
+      type: object
+      properties:
+        customerId:
+          type: string
+        score:
+          type: integer
+          minimum: 1
+          maximum: 5
+        review:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Order:
+      type: object
+      properties:
+        _id:
+          type: string
+        customerId:
+          type: string
+        vendorId:
+          type: string
+        fileUrl:
+          type: string
+        fileName:
+          type: string
+        fileType:
+          type: string
+        pageCount:
+          type: integer
+        printConfig:
+          type: object
+          properties:
+            paperSize:
+              type: string
+            printType:
+              type: string
+            copies:
+              type: integer
+        pricePerPage:
+          type: number
+        totalAmount:
+          type: number
+        bookingFee:
+          type: number
+        walletAmountUsed:
+          type: number
+        freePagesUsed:
+          type: integer
+        finalAmount:
+          type: number
+        pickupToken:
+          type: string
+        status:
+          type: string
+          enum: [pending, accepted, printing, completed, rejected]
+        payment:
+          type: object
+          properties:
+            method:
+              type: string
+            status:
+              type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Transaction:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [signup_bonus, referral_bonus, referee_bonus, refund, debit, booking_fee]
+        amount:
+          type: number
+        balanceType:
+          type: string
+          enum: [promotional, refunded]
+        description:
+          type: string
+        orderId:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        isExpired:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    Error:
+      type: object
+      properties:
+        statusCode:
+          type: integer
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: string

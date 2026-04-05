@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import logger from './logger.js'
 
 const transporter = nodemailer.createTransport({
     host: "smtp.gmail.com",
@@ -122,7 +123,7 @@ export const sendOtpEmail = async (email, otp) => {
         await transporter.sendMail(mailOptions)
         return true
     } catch (error) {
-        console.error("Email sending failed:", error)
+        logger.error("Email sending failed:", error)
         throw error
     }
 }

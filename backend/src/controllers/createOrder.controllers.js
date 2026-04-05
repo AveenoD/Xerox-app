@@ -12,16 +12,6 @@ import logger from '../utils/logger.js'
 
 const BOOKING_FEE = 2 // ₹2 on cash orders — Phase 1
 
-// ── Push Notification Helper ──────────────────────────
-const notifyUser = async (userId, payload) => {
-    try {
-        const sub = await PushSubscription.findOne({ userId })
-        if (sub) await sendPushNotification(sub.subscription, payload)
-    } catch (err) {
-        logger.error('Push notify failed:', err.message)
-    }
-}
-
 // ── Create Order ──────────────────────────────────────
 const createOrder = asyncHandler(async (req, res) => {
     const { vendorId, paymentMethod, useWallet } = req.body
@@ -139,13 +129,6 @@ const createOrder = asyncHandler(async (req, res) => {
         if (orderCount === 1) {
             await creditReferralBonus(req.user._id, order._id)
         }
-
-        // 5. Notify vendor
-        await notifyUser(vendor.userId, {
-            title: 'New Order! 🔔',
-            body: `New print order — Token #${order.pickupToken}`,
-            url: '/dashboard'
-        })
 
         logger.info(`Order created: ${order._id} — ₹${finalAmount} — ${paymentMethod}`)
 
@@ -299,18 +282,6 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     order.status = status
     if (status === 'rejected') order.cancelReason = 'vendor_rejected'
     await order.save()
-
-    // ── Notifications ─────────────────────────────
-    const notifMap = {
-        accepted:  { title: 'Order Accepted! ✅', body: `Your order #${order.pickupToken} has been accepted`, url: `/order/${order._id}` },
-        printing:  { title: 'Printing Started 🖨️', body: `Your order #${order.pickupToken} is being printed`, url: `/order/${order._id}` },
-        completed: { title: 'Order Ready! 🎉', body: `Your order #${order.pickupToken} is ready for pickup`, url: `/order/${order._id}` },
-        rejected:  { title: 'Order Rejected ❌', body: `Your order #${order.pickupToken} was rejected`, url: '/my-orders' }
-    }
-
-    if (notifMap[status]) {
-        await notifyUser(order.customerId, notifMap[status])
-    }
 
     logger.info(`Order ${order._id} → ${status} by vendor ${vendor._id}`)
 

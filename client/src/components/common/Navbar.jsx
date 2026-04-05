@@ -1,11 +1,12 @@
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Home, Package, User, LayoutDashboard, Settings } from 'lucide-react'
+import { Home, Package, User, LayoutDashboard, Settings, Wallet } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext.jsx'
 
 const CUSTOMER_TABS = [
     { path: '/',          icon: Home,            label: 'Home' },
-    { path: '/my-orders', icon: Package,          label: 'Orders' },
-    { path: '/profile',   icon: User,             label: 'Profile' },
+    { path: '/my-orders', icon: Package,         label: 'Orders' },
+    { path: '/wallet',    icon: Wallet,          label: 'Wallet' },
+    { path: '/profile',   icon: User,            label: 'Profile' },
 ]
 
 const VENDOR_TABS = [
@@ -20,7 +21,7 @@ const Navbar = () => {
     const location = useLocation()
 
     const hideOn = ['/login', '/register', '/verify-otp']
-    const hideOnDynamic = ['/create-order', '/vendor']
+    const hideOnDynamic = ['/create-order', '/vendor', '/referral', '/disputes']
 
     const shouldHide =
         hideOn.includes(location.pathname) ||
@@ -31,9 +32,10 @@ const Navbar = () => {
     const tabs = user?.role === 'vendor' ? VENDOR_TABS : CUSTOMER_TABS
 
     return (
-        <div className="fixed bottom-0 left-0 right-0 z-50 px-4 py-3"
+        <div className="fixed bottom-0 left-0 right-0 z-50 px-4 py-3 safe-area-bottom"
             style={{ backgroundColor: '#1A1D27',
-                     borderTop: '1px solid #2E3148' }}>
+                     borderTop: '1px solid #2E3148',
+                     paddingBottom: 'calc(12px + env(safe-area-inset-bottom, 0px))' }}>
             <div className="max-w-lg mx-auto flex justify-around">
                 {tabs.map(tab => {
                     const Icon = tab.icon

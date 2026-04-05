@@ -98,6 +98,18 @@ const vendorSchema = new Schema({
     planExpiresAt:{
         type: Date,
         default: null
+    },
+    strikes: {
+        type: Number,
+        default: 0
+    },
+    suspendReason: {
+        type: String,
+        default: null
+    },
+    suspendedUntil: {
+        type: Date,
+        default: null
     }
 }, { timestamps: true },);
 vendorSchema.index({ location: "2dsphere" })

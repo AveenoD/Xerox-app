@@ -88,7 +88,30 @@ const orderSchema = new Schema({
             default: null
         }
     },
-    
+    bookingFee: {
+        type: Number,
+        default: 0
+    },
+    walletAmountUsed: {
+        type: Number,
+        default: 0
+    },
+    freePagesUsed: {
+        type: Number,
+        default: 0
+    },
+    finalAmount: {
+        type: Number,
+        default: 0
+    },
+    filePublicId: {
+        type: String,
+        default: null
+    },
+    fileDeletedAt: {
+        type: Date,
+        default: null
+    }
 }, {timestamps: true})
 
 export const Order = mongoose.model("Order", orderSchema);

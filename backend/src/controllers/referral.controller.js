@@ -4,6 +4,7 @@ import { ApiResponse } from '../utils/ApiResponse.js'
 import { Referral } from '../models/referral.models.js'
 import { User } from '../models/user.models.js'
 import { Wallet } from '../models/wallet.models.js'
+import logger from '../utils/logger.js'
 
 // ── Get my referral code + stats ──────────────────────
 export const getMyReferral = asyncHandler(async (req, res) => {
@@ -52,9 +53,9 @@ export const creditSignupBonus = async (userId) => {
         // Mark user signup bonus credited
         await User.findByIdAndUpdate(userId, { signupBonusCredited: true })
 
-        console.log(`✅ Signup bonus ₹10 credited to user ${userId}`)
+        logger.info(`Signup bonus ₹10 credited to user ${userId}`)
     } catch (err) {
-        console.error('Signup bonus credit failed:', err.message)
+        logger.error('Signup bonus credit failed:', err.message)
     }
 }
 
@@ -89,9 +90,9 @@ export const creditReferralBonus = async (refereeId, orderId) => {
         referral.completedAt = new Date()
         await referral.save()
 
-        console.log(`✅ Referral bonus ₹10 credited to user ${referral.referrerId}`)
+        logger.info(`Referral bonus ₹10 credited to user ${referral.referrerId}`)
     } catch (err) {
-        console.error('Referral bonus credit failed:', err.message)
+        logger.error('Referral bonus credit failed:', err.message)
     }
 }
 
@@ -114,9 +115,9 @@ export const handleReferralOnSignup = async (newUserId, referralCode) => {
             referralCode
         })
 
-        console.log(`✅ Referral tracked: ${referrer._id} → ${newUserId}`)
+        logger.info(`Referral tracked: ${referrer._id} → ${newUserId}`)
     } catch (err) {
-        console.error('Referral tracking failed:', err.message)
+        logger.error('Referral tracking failed:', err.message)
     }
 }
 
@@ -128,6 +129,6 @@ export const markRefereeSignupComplete = async (userId) => {
             { signupBonusCredited: true }
         )
     } catch (err) {
-        console.error('Referral signup mark failed:', err.message)
+        logger.error('Referral signup mark failed:', err.message)
     }
 }

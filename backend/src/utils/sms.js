@@ -1,7 +1,9 @@
 import axios from 'axios'
 import {ApiError} from './ApiError.js'
+import logger from './logger.js'
+
 export const sendOtpSms = async (phone, otp) => {
-  console.log(`📱 Phone OTP for ${phone}: ${otp}`)
+    logger.info(`Phone OTP for ${phone}: ${otp}`)
     return true
 
         // const smsApiUrl = 'https://www.fast2sms.com/dev/bulkV2'

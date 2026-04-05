@@ -3,13 +3,17 @@ import { useNavigate } from 'react-router-dom'
 import {
     Package, Clock, Printer, CheckCircle,
     XCircle, ToggleLeft, ToggleRight,
-    Settings, LogOut, TrendingUp
+    Settings, LogOut, TrendingUp,
+    ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext.jsx'
 import StatusBadge from '../../components/common/StatusBadge.jsx'
 import Loader from '../../components/common/Loader.jsx'
+import { DashboardOrderSkeleton, StatsSkeleton } from '../../components/common/Skeleton.jsx'
 import usePolling from '../../hooks/usePolling.js'
 import api from '../../utils/axios.js'
+
+const ORDERS_PER_PAGE = 20
 
 const NEXT_STATUS = {
     pending:  'accepted',
@@ -31,18 +35,23 @@ const Dashboard = () => {
     const [updatingOrder, setUpdatingOrder] = useState(null)
     const [activeTab, setActiveTab] = useState('active')
     const [error, setError] = useState('')
+    const [currentPage, setCurrentPage] = useState(1)
+    const [totalPages, setTotalPages] = useState(1)
 
     const { user, logout } = useAuth()
     const navigate = useNavigate()
 
-    const fetchDashboard = async () => {
+    const fetchDashboard = async (page = currentPage) => {
         try {
             const [vendorRes, ordersRes] = await Promise.all([
                 api.get('/vendor/profile/me'),
-                api.get('/orders/vendor-orders')
+                api.get('/orders/vendor-orders', {
+                    params: { page, limit: ORDERS_PER_PAGE }
+                })
             ])
             setVendor(vendorRes.data.data)
-            setOrders(ordersRes.data.data)
+            setOrders(ordersRes.data.data || [])
+            setTotalPages(ordersRes.data.pagination?.totalPages || 1)
         } catch(err) {
             if(err.response?.status === 400){
                 setOrders([])
@@ -59,7 +68,67 @@ const Dashboard = () => {
     }, [])
 
     // Auto refresh every 20 seconds
-    usePolling(fetchDashboard, 20000, !loading)
+    usePolling(() => fetchDashboard(currentPage), 20000, !loading)
+
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= totalPages) {
+            setCurrentPage(newPage)
+            setLoading(true)
+        }
+    }
+
+    // Show skeleton loaders during initial load
+    if (loading) {
+        return (
+            <div className="min-h-screen safe-area-pb"
+                style={{ backgroundColor: '#0F1117' }}>
+                {/* Header */}
+                <div className="sticky top-0 z-10 px-4 py-4"
+                    style={{ backgroundColor: '#0F1117',
+                             borderBottom: '1px solid #2E3148' }}>
+                    <div className="max-w-2xl mx-auto">
+                        <div className="w-32 h-6 rounded mb-1"
+                            style={{ backgroundColor: '#2E3148' }} />
+                        <div className="w-48 h-4 rounded"
+                            style={{ backgroundColor: '#2E3148' }} />
+                    </div>
+                </div>
+
+                <div className="max-w-2xl mx-auto px-4 py-4 space-y-4">
+                    {/* Shop Status Skeleton */}
+                    <div className="p-4 rounded-2xl flex items-center justify-between"
+                        style={{ backgroundColor: '#1A1D27', border: '1px solid #2E3148' }}>
+                        <div>
+                            <div className="w-24 h-5 rounded mb-1"
+                                style={{ backgroundColor: '#2E3148' }} />
+                            <div className="w-32 h-3 rounded"
+                                style={{ backgroundColor: '#2E3148' }} />
+                        </div>
+                        <div className="w-10 h-6 rounded"
+                            style={{ backgroundColor: '#2E3148' }} />
+                    </div>
+
+                    {/* Stats Skeleton */}
+                    <StatsSkeleton />
+
+                    {/* Tabs Skeleton */}
+                    <div className="flex gap-2">
+                        <div className="flex-1 h-10 rounded-xl"
+                            style={{ backgroundColor: '#2E3148' }} />
+                        <div className="flex-1 h-10 rounded-xl"
+                            style={{ backgroundColor: '#2E3148' }} />
+                    </div>
+
+                    {/* Orders Skeleton */}
+                    <div className="space-y-3">
+                        {[1, 2, 3].map((i) => (
+                            <DashboardOrderSkeleton key={i} />
+                        ))}
+                    </div>
+                </div>
+            </div>
+        )
+    }
 
     const toggleShopStatus = async () => {
         setTogglingStatus(true)
@@ -187,10 +256,10 @@ const Dashboard = () => {
         .filter(o => o.status === 'completed')
         .reduce((sum, o) => sum + o.totalAmount, 0)
 
-    if(loading) return <Loader />
+
 
     return (
-        <div className="min-h-screen pb-24"
+        <div className="min-h-screen safe-area-pb"
             style={{ backgroundColor: '#0F1117' }}>
 
             {/* Header */}
@@ -471,6 +540,34 @@ const Dashboard = () => {
                                 </div>
                             )
                         })}
+                    </div>
+                )}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-4 mt-6 pt-4"
+                        style={{ borderTop: '1px solid #2E3148' }}>
+                        <button
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="w-9 h-9 rounded-lg flex items-center justify-center disabled:opacity-40"
+                            style={{ backgroundColor: '#1A1D27',
+                                     border: '1px solid #2E3148' }}>
+                            <ChevronLeft size={18} color="#F1F5F9" />
+                        </button>
+                        
+                        <span className="text-sm" style={{ color: '#94A3B8' }}>
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        
+                        <button
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="w-9 h-9 rounded-lg flex items-center justify-center disabled:opacity-40"
+                            style={{ backgroundColor: '#1A1D27',
+                                     border: '1px solid #2E3148' }}>
+                            <ChevronRight size={18} color="#F1F5F9" />
+                        </button>
                     </div>
                 )}
             </div>

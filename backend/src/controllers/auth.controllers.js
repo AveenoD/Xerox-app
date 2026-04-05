@@ -94,10 +94,6 @@ const verifyEmailOtp = asyncHandler(async (req, res) => {
         email
     })
 
-    console.log("User found:", user?.email)
-    console.log("emailOtpExpiry:", user?.emailOtpExpiry)
-    console.log("current time:", new Date())
-    console.log("isExpired:", user?.emailOtpExpiry < new Date())
     if (!user) {
         throw new ApiError(404, "User not found")
     }

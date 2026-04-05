@@ -1,24 +1,32 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Package, CheckCircle } from 'lucide-react'
+import { Package, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 import OrderCard from './OrderCard.jsx'
 import Loader from '../../components/common/Loader.jsx'
+import { OrderCardSkeleton } from '../../components/common/Skeleton.jsx'
 import usePolling from '../../hooks/usePolling.js'
 import api from '../../utils/axios.js'
+
+const ORDERS_PER_PAGE = 10
 
 const MyOrders = () => {
     const [orders, setOrders] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
+    const [currentPage, setCurrentPage] = useState(1)
+    const [totalPages, setTotalPages] = useState(1)
 
     const navigate = useNavigate()
     const location = useLocation()
     const newOrder = location.state?.newOrder
 
-    const fetchOrders = async () => {
+    const fetchOrders = async (page = currentPage) => {
         try {
-            const res = await api.get('/orders/my-orders')
-            setOrders(res.data.data)
+            const res = await api.get('/orders/my-orders', {
+                params: { page, limit: ORDERS_PER_PAGE }
+            })
+            setOrders(res.data.data || [])
+            setTotalPages(res.data.pagination?.totalPages || 1)
         } catch(err) {
             if(err.response?.status === 400){
                 setOrders([])
@@ -32,15 +40,46 @@ const MyOrders = () => {
 
     useEffect(() => {
         fetchOrders()
-    }, [])
+    }, [currentPage])
 
     // Auto refresh every 15 seconds
-    usePolling(fetchOrders, 15000, !loading)
+    usePolling(() => fetchOrders(currentPage), 15000, !loading)
 
-    if(loading) return <Loader />
+    const handlePageChange = (newPage) => {
+        if (newPage >= 1 && newPage <= totalPages) {
+            setCurrentPage(newPage)
+            setLoading(true)
+        }
+    }
+
+    // Show skeleton loaders during initial load
+    if (loading) {
+        return (
+            <div className="min-h-screen safe-area-pb"
+                style={{ backgroundColor: '#0F1117' }}>
+                {/* Header */}
+                <div className="sticky top-0 z-10 px-4 py-4"
+                    style={{ backgroundColor: '#0F1117',
+                             borderBottom: '1px solid #2E3148' }}>
+                    <div className="max-w-lg mx-auto">
+                        <div className="w-32 h-6 rounded mb-1"
+                            style={{ backgroundColor: '#2E3148' }} />
+                        <div className="w-48 h-4 rounded"
+                            style={{ backgroundColor: '#2E3148' }} />
+                    </div>
+                </div>
+
+                <div className="max-w-lg mx-auto px-4 py-4 space-y-3">
+                    {[1, 2, 3].map((i) => (
+                        <OrderCardSkeleton key={i} />
+                    ))}
+                </div>
+            </div>
+        )
+    }
 
     return (
-        <div className="min-h-screen pb-24"
+        <div className="min-h-screen safe-area-pb"
             style={{ backgroundColor: '#0F1117' }}>
 
             {/* Header */}
@@ -125,6 +164,34 @@ const MyOrders = () => {
                 {orders.map(order => (
                     <OrderCard key={order._id} order={order} />
                 ))}
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="flex items-center justify-center gap-4 mt-6 pt-4"
+                        style={{ borderTop: '1px solid #2E3148' }}>
+                        <button
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            className="w-9 h-9 rounded-lg flex items-center justify-center disabled:opacity-40"
+                            style={{ backgroundColor: '#1A1D27',
+                                     border: '1px solid #2E3148' }}>
+                            <ChevronLeft size={18} color="#F1F5F9" />
+                        </button>
+                        
+                        <span className="text-sm" style={{ color: '#94A3B8' }}>
+                            Page {currentPage} of {totalPages}
+                        </span>
+                        
+                        <button
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            className="w-9 h-9 rounded-lg flex items-center justify-center disabled:opacity-40"
+                            style={{ backgroundColor: '#1A1D27',
+                                     border: '1px solid #2E3148' }}>
+                            <ChevronRight size={18} color="#F1F5F9" />
+                        </button>
+                    </div>
+                )}
 
             </div>
         </div>

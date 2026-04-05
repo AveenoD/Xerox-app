@@ -1,1 +1,23 @@
 @import "tailwindcss";
+
+/* Safe Area Insets for Mobile Devices */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+    .safe-area-bottom {
+        padding-bottom: env(safe-area-inset-bottom);
+    }
+    
+    .safe-area-pb {
+        padding-bottom: calc(72px + env(safe-area-inset-bottom));
+    }
+}
+
+/* Fallback for devices without safe area support */
+@supports not (padding-bottom: env(safe-area-inset-bottom)) {
+    .safe-area-bottom {
+        padding-bottom: 0;
+    }
+    
+    .safe-area-pb {
+        padding-bottom: 72px;
+    }
+}
