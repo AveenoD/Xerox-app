@@ -99,10 +99,29 @@ const vendorSchema = new Schema({
         type: Date,
         default: null
     },
-    strikes: {
+    strikeCount: {
         type: Number,
         default: 0
     },
+    strikes: [{
+        reason: {
+            type: String,
+            required: true
+        },
+        description: {
+            type: String,
+            default: ''
+        },
+        orderId: {
+            type: Schema.Types.ObjectId,
+            ref: 'Order',
+            default: null
+        },
+        createdAt: {
+            type: Date,
+            default: Date.now
+        }
+    }],
     suspendReason: {
         type: String,
         default: null
@@ -111,7 +130,7 @@ const vendorSchema = new Schema({
         type: Date,
         default: null
     }
-}, { timestamps: true },);
+}, { timestamps: true });
 vendorSchema.index({ location: "2dsphere" })
 
 const VendorProfile = mongoose.model("VendorProfile", vendorSchema);

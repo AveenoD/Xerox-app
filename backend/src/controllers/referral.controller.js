@@ -61,8 +61,18 @@ export const creditSignupBonus = async (userId) => {
 
 // ── Internal: credit referral bonus when referee
 //             places first order ────────────────────────
-export const creditReferralBonus = async (refereeId, orderId) => {
+// TIERED REWARD SYSTEM:
+// - If referrer has < 3 total referrals: credit ₹10
+// - If referrer has >= 4 total referrals: credit ₹5
+// - Only triggers if order total >= ₹20
+export const creditReferralBonus = async (refereeId, orderId, orderTotal) => {
     try {
+        // Check minimum order amount for referral bonus
+        if (orderTotal < 20) {
+            logger.info(`Referral bonus skipped: order total ₹${orderTotal} < ₹20 minimum`)
+            return
+        }
+
         const referral = await Referral.findOne({
             refereeId,
             signupBonusCredited: true,
@@ -71,16 +81,26 @@ export const creditReferralBonus = async (refereeId, orderId) => {
 
         if (!referral) return // No valid referral found
 
-        // Credit ₹10 to referrer (User A)
+        // Count total referrals for this referrer
+        const totalReferrals = await Referral.countDocuments({
+            referrerId: referral.referrerId,
+            signupBonusCredited: true
+        })
+
+        // Determine bonus amount based on tier
+        // < 3 referrals = ₹10, >= 4 referrals = ₹5
+        const bonusAmount = totalReferrals < 4 ? 10 : 5
+
+        // Credit to referrer (User A)
         let referrerWallet = await Wallet.findOne({ userId: referral.referrerId })
         if (!referrerWallet) {
             referrerWallet = await Wallet.create({ userId: referral.referrerId })
         }
 
         await referrerWallet.addPromoCredit(
-            10,
+            bonusAmount,
             'referral_bonus',
-            'Referral bonus — your friend placed their first order',
+            `Referral bonus — your friend placed their first order (Tier: ${totalReferrals < 4 ? 'High' : 'Standard'})`,
             orderId
         )
 
@@ -88,9 +108,10 @@ export const creditReferralBonus = async (refereeId, orderId) => {
         referral.referralBonusCredited = true
         referral.firstOrderId = orderId
         referral.completedAt = new Date()
+        referral.bonusAmount = bonusAmount
         await referral.save()
 
-        logger.info(`Referral bonus ₹10 credited to user ${referral.referrerId}`)
+        logger.info(`Referral bonus ₹${bonusAmount} credited to user ${referral.referrerId} (total referrals: ${totalReferrals})`)
     } catch (err) {
         logger.error('Referral bonus credit failed:', err.message)
     }

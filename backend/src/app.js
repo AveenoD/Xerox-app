@@ -80,6 +80,12 @@ app.use('/api/referral', ReferralRouter)
 import DisputeRouter from './routes/Dispute.routes.js'
 app.use('/api/dispute', DisputeRouter)
 
+import fileRouter from './routes/file.routes.js'
+app.use('/api/files', fileRouter)
+
+import vendorPlanRouter from './routes/vendorPlan.routes.js'
+app.use('/api/vendor-plans', vendorPlanRouter)
+
 // Swagger API Documentation
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument, {
     explorer: true,

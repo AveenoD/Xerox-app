@@ -36,6 +36,10 @@ const referralSchema = new Schema({
     completedAt: {
         type: Date,
         default: null
+    },
+    bonusAmount: {
+        type: Number,
+        default: null
     }
 }, { timestamps: true })
 

@@ -31,9 +31,16 @@ const userSchema = new Schema({
     },
     role: {
         type: String,
-        enum: ["customer", "vendor"],
+        enum: ["customer", "vendor", "admin"],
         default: "customer",
-
+    },
+    fcmToken: {
+        type: String,
+        default: null,
+    },
+    walletBalance: {
+        type: Number,
+        default: 0,
     },
     refreshToken: {
         type: String
@@ -72,8 +79,10 @@ const userSchema = new Schema({
         sparse: true
     },
     referredBy: {
-        type: String,
-        default: null
+        type: Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+        index: true,
     },
 
     // Bonuses

@@ -8,6 +8,7 @@ import { Order } from '../models/order.models.js'
 import { User } from '../models/user.models.js'
 import { Wallet } from '../models/wallet.models.js'
 import { creditReferralBonus } from './referral.controller.js'
+import { startSLAMonitoring, stopSLAMonitoring } from '../utils/slaMonitor.js'
 import logger from '../utils/logger.js'
 
 const BOOKING_FEE = 2 // ₹2 on cash orders — Phase 1
@@ -125,10 +126,19 @@ const createOrder = asyncHandler(async (req, res) => {
         session.endSession()
 
         // 4. Check if this is referee's FIRST order → credit referrer bonus
-        const orderCount = await Order.countDocuments({ customerId: req.user._id })
-        if (orderCount === 1) {
-            await creditReferralBonus(req.user._id, order._id)
+        // Only count completed orders (not cancelled/rejected)
+        const completedOrdersCount = await Order.countDocuments({ 
+            customerId: req.user._id,
+            status: { $nin: ['rejected', 'cancelled'] }
+        })
+        
+        // Trigger referral bonus on first successful order if total >= ₹20
+        if (completedOrdersCount === 1 && finalAmount >= 20) {
+            await creditReferralBonus(req.user._id, order._id, finalAmount)
         }
+
+        // Start SLA monitoring for this order
+        startSLAMonitoring(order._id.toString(), vendorId)
 
         logger.info(`Order created: ${order._id} — ₹${finalAmount} — ${paymentMethod}`)
 
@@ -218,6 +228,9 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
             throw new ApiError(400, "Customers can only cancel orders")
         }
 
+        // Stop SLA monitoring
+        stopSLAMonitoring(order._id.toString())
+
         // Refund wallet amount if used
         if (order.walletAmountUsed > 0) {
             let wallet = await Wallet.findOne({ userId: req.user._id })
@@ -260,6 +273,17 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
         throw new ApiError(403, "Unauthorized")
     }
 
+    // Check plan limit when accepting order
+    if (status === 'accepted' && req.vendorPlan) {
+        if (req.vendorPlan.isLimitReached()) {
+            throw new ApiError(403, 
+                `Upgrade to accept more orders. ` +
+                `You have used ${req.vendorPlan.ordersUsedThisMonth} orders this month. ` +
+                `Current plan: ${req.vendorPlan.plan.toUpperCase()}`
+            )
+        }
+    }
+
     // Vendor reject — refund wallet
     if (status === 'rejected' && order.walletAmountUsed > 0) {
         let wallet = await Wallet.findOne({ userId: order.customerId })
@@ -282,6 +306,17 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
     order.status = status
     if (status === 'rejected') order.cancelReason = 'vendor_rejected'
     await order.save()
+
+    // Stop SLA monitoring when order is accepted or rejected
+    if (status === 'accepted' || status === 'rejected') {
+        stopSLAMonitoring(order._id.toString())
+    }
+
+    // Increment order count when accepted
+    if (status === 'accepted' && req.vendorPlan) {
+        await req.vendorPlan.incrementOrderCount()
+        logger.info(`Order count incremented for vendor ${vendor._id}`)
+    }
 
     logger.info(`Order ${order._id} → ${status} by vendor ${vendor._id}`)
 
