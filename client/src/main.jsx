@@ -14,6 +14,8 @@ import Layout from './components/common/Layout.jsx'
 import BecomeVendor from './pages/vendor/BecomeVendor.jsx'
 import ManageShop from './pages/vendor/ManageShop.jsx'
 import Profile from './pages/shared/Profile.jsx'
+import AdminDashboard from './pages/admin/AdminDashboard.jsx'
+import AdminNotify from './pages/admin/AdminNotify.jsx'
 
 // Lazy load heavy components
 const Dashboard = lazy(() => import('./pages/vendor/Dashboard.jsx'))
@@ -63,6 +65,13 @@ const router = createBrowserRouter([
                 children: [
                     { path: '/dashboard', element: <Suspense fallback={<PageLoader />}><Dashboard /></Suspense> },
                     { path: '/manage-shop', element: <ManageShop /> },
+                ]
+            },
+            {
+                element: <ProtectedRoute requiredRole="admin" />,
+                children: [
+                    { path: '/admin', element: <AdminDashboard /> },
+                    { path: '/admin/notify', element: <AdminNotify /> },
                 ]
             }
         ]
