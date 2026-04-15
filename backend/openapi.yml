@@ -1,0 +1,1249 @@
+openapi: 3.0.3
+info:
+  title: XConnect API
+  description: |
+    Print-on-demand marketplace API (Zepto/Swiggy/Ola style).
+    Vendors (xerox shop owners) register their shops, users find nearby shops,
+    upload PDFs, and get prints delivered.
+  version: 1.0.0
+  contact:
+    name: XConnect Support
+    email: support@xconnect.app
+
+servers:
+  - url: http://localhost:5000/api
+    description: Development server
+  - url: https://api.xconnect.app/api
+    description: Production server
+
+tags:
+  - name: Auth
+    description: Authentication & user registration
+  - name: User
+    description: User profile & settings
+  - name: Vendor
+    description: Vendor management & shop operations
+  - name: Orders
+    description: Order lifecycle & tracking
+  - name: Wallet
+    description: Wallet & transactions
+
+paths:
+  # ==================== AUTH ====================
+  /auth/send-otp:
+    post:
+      tags: [Auth]
+      summary: Send OTP to email
+      description: |
+        Sends a 6-digit OTP to the provided email for verification.
+        Validates email domain against whitelist (gmail.com, yahoo.com, outlook.com, etc.)
+        and blocks disposable email providers.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@gmail.com
+                  description: Email address to receive OTP
+      responses:
+        '200':
+          description: OTP sent successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OTP sent successfully
+                  expiresIn:
+                    type: integer
+                    example: 300
+                    description: OTP expiry in seconds
+
+  /auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Verify email OTP
+      description: Verifies the OTP sent to the email. Creates a temporary session.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@gmail.com
+                otp:
+                  type: string
+                  example: "123456"
+                  description: 6-digit OTP
+      responses:
+        '200':
+          description: OTP verified successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  verified:
+                    type: boolean
+                    example: true
+                  email:
+                    type: string
+                    example: user@gmail.com
+
+  /auth/resend-otp:
+    post:
+      tags: [Auth]
+      summary: Resend OTP
+      description: Resends a new OTP to the email (rate limited to prevent abuse).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@gmail.com
+      responses:
+        '200':
+          description: New OTP sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OTP resent successfully
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Complete user registration
+      description: |
+        Registers a new user with email, password, and details.
+        Requires prior OTP verification. Assigns referral code and signup bonus.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password, fullName, phone]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@gmail.com
+                password:
+                  type: string
+                  minLength: 6
+                  example: securePassword123
+                  description: Password (min 6 characters)
+                fullName:
+                  type: string
+                  example: Rahul Kumar
+                  description: User's full name
+                phone:
+                  type: string
+                  example: "9876543210"
+                  description: Phone number (10 digits)
+                referralCode:
+                  type: string
+                  example: XCA1B2C3
+                  description: Optional referral code from a friend
+                acceptTerms:
+                  type: boolean
+                  example: true
+                  description: Must accept Terms & Conditions
+      responses:
+        '201':
+          description: Registration successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: User login
+      description: Authenticates user with email and password.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@gmail.com
+                password:
+                  type: string
+                  example: securePassword123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      description: |
+        Uses the refresh token (from httpOnly cookie) to generate new access token.
+        Implements secure token rotation.
+      security: []
+      responses:
+        '200':
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout user
+      description: Clears authentication cookies.
+      responses:
+        '200':
+          description: Logged out successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      description: Returns authenticated user's profile.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile fetched
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  # ==================== VENDORS ====================
+  /vendors/search:
+    get:
+      tags: [Vendor]
+      summary: Search nearby vendors
+      description: |
+        Geo-search for open vendors near coordinates.
+        Results sorted by distance and vendor plan priority.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: longitude
+          required: true
+          schema:
+            type: number
+          example: 77.2090
+          description: Longitude coordinate
+        - in: query
+          name: latitude
+          required: true
+          schema:
+            type: number
+          example: 28.6139
+          description: Latitude coordinate
+        - in: query
+          name: maxDistance
+          schema:
+            type: integer
+            default: 5000
+          description: Max distance in meters (default 5000)
+        - in: query
+          name: minRating
+          schema:
+            type: number
+            minimum: 0
+            maximum: 5
+          description: Minimum rating filter
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: List of nearby vendors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Vendor'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /vendors/register:
+    post:
+      tags: [Vendor]
+      summary: Register as vendor
+      description: |
+        Registers current user as a vendor with shop details.
+        Creates subscription record with 1-month FREE trial.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [shopName, shopAddress, coordinates, pricing]
+              properties:
+                shopName:
+                  type: string
+                  example: "Kumar Xerox & Printers"
+                shopAddress:
+                  type: string
+                  example: "Shop 12, Main Market, Karol Bagh, Delhi"
+                coordinates:
+                  type: array
+                  minItems: 2
+                  maxItems: 2
+                  items:
+                    type: number
+                  example: [77.2090, 28.6139]
+                  description: "[longitude, latitude]"
+                pricing:
+                  type: object
+                  required: [A4]
+                  properties:
+                    A4:
+                      type: object
+                      properties:
+                        bw_single:
+                          type: number
+                          example: 2
+                          description: B&W single-sided (₹/page)
+                        bw_double:
+                          type: number
+                          example: 3
+                          description: B&W double-sided (₹/page)
+                        color_single:
+                          type: number
+                          example: 8
+                          description: Color single-sided (₹/page)
+                        color_double:
+                          type: number
+                          example: 12
+                          description: Color double-sided (₹/page)
+                    A3:
+                      type: object
+                      properties:
+                        bw_single:
+                          type: number
+                          example: 4
+                        bw_double:
+                          type: number
+                          example: 6
+                        color_single:
+                          type: number
+                          example: 15
+                        color_double:
+                          type: number
+                          example: 20
+                    Legal:
+                      type: object
+                      properties:
+                        bw_single:
+                          type: number
+                          example: 3
+                        bw_double:
+                          type: number
+                          example: 4
+                        color_single:
+                          type: number
+                          example: 10
+                        color_double:
+                          type: number
+                          example: 15
+                shopPhoto:
+                  type: string
+                  description: Base64 or URL of shop photo
+      responses:
+        '201':
+          description: Vendor registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+
+  /vendors/profile/me:
+    get:
+      tags: [Vendor]
+      summary: Get my vendor profile
+      description: Returns vendor's own profile with analytics.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Vendor profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+    patch:
+      tags: [Vendor]
+      summary: Update vendor profile
+      description: Updates shop details, pricing, or photo.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                shopName:
+                  type: string
+                shopAddress:
+                  type: string
+                shopPhoto:
+                  type: string
+                pricing:
+                  $ref: '#/components/schemas/Pricing'
+      responses:
+        '200':
+          description: Vendor updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+
+  /vendors/profile/status:
+    patch:
+      tags: [Vendor]
+      summary: Toggle shop open/close
+      description: |
+        Opens or closes the shop for new orders.
+        Cannot toggle if shop is suspended.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Shop status toggled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  isOpen:
+                    type: boolean
+
+  /vendors/analytics/me:
+    get:
+      tags: [Vendor]
+      summary: Get vendor analytics
+      description: Returns today's orders, revenue, week stats, and rating.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Analytics data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  todayOrders:
+                    type: integer
+                  todayRevenue:
+                    type: number
+                  weekOrders:
+                    type: integer
+                  weekRevenue:
+                    type: number
+                  averageRating:
+                    type: number
+                  totalOrders:
+                    type: integer
+                  completedOrders:
+                    type: integer
+
+  /vendors/{vendorId}:
+    get:
+      tags: [Vendor]
+      summary: Get vendor by ID
+      description: Returns public vendor details for customers.
+      security: []
+      parameters:
+        - in: path
+          name: vendorId
+          required: true
+          schema:
+            type: string
+          description: Vendor profile ID
+      responses:
+        '200':
+          description: Vendor details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Vendor'
+
+  /vendors/{vendorId}/cost:
+    get:
+      tags: [Vendor]
+      summary: Calculate print cost
+      description: Calculates cost for a specific print configuration.
+      security: []
+      parameters:
+        - in: path
+          name: vendorId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: paperSize
+          required: true
+          schema:
+            type: string
+            enum: [A4, A3, Legal]
+          example: A4
+        - in: query
+          name: printType
+          required: true
+          schema:
+            type: string
+            enum: [bw_single, bw_double, color_single, color_double]
+          example: bw_single
+        - in: query
+          name: pageCount
+          required: true
+          schema:
+            type: integer
+          example: 10
+        - in: query
+          name: copies
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: Cost calculated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cost:
+                    type: number
+                    description: Total print cost in ₹
+
+  # ==================== ORDERS ====================
+  /orders/:
+    post:
+      tags: [Orders]
+      summary: Create new order
+      description: |
+        Creates an order for a vendor. User uploads PDF file.
+        Calculates print cost + platform fee (page-wise).
+        Starts SLA countdown timer.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [vendorId, pageCount, printConfig]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: PDF or document file
+                vendorId:
+                  type: string
+                  description: Vendor profile ID
+                pageCount:
+                  type: integer
+                  example: 10
+                  description: Total pages in document
+                printConfig:
+                  type: string
+                  example: '{"paperSize":"A4","printType":"bw_single","copies":1}'
+                  description: JSON string with paperSize, printType, copies
+                customerNotes:
+                  type: string
+                  example: "Please staple at corner"
+                  description: Optional notes for vendor
+      responses:
+        '201':
+          description: Order created, SLA timer started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/my-orders:
+    get:
+      tags: [Orders]
+      summary: Get my orders (customer)
+      description: Returns list of orders placed by the user.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, accepted, printing, ready, completed, rejected, cancelled]
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: List of orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /orders/vendor/orders:
+    get:
+      tags: [Orders]
+      summary: Get vendor's orders
+      description: Returns list of orders for the vendor (incoming queue).
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, accepted, printing, ready, completed, rejected, cancelled]
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: Vendor orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Order'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /orders/{orderId}:
+    get:
+      tags: [Orders]
+      summary: Get order by ID
+      description: Returns order details for customer or vendor.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{orderId}/accept:
+    patch:
+      tags: [Orders]
+      summary: Accept order (vendor)
+      description: Vendor accepts the order within SLA time.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{orderId}/reject:
+    patch:
+      tags: [Orders]
+      summary: Reject order (vendor)
+      description: |
+        Vendor rejects the order. Must provide a reason.
+        May trigger SLA penalty if no valid reason.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  example: "File too large for printer"
+      responses:
+        '200':
+          description: Order rejected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{orderId}/printing:
+    patch:
+      tags: [Orders]
+      summary: Mark as printing (vendor)
+      description: Vendor marks order as "printing" to indicate work started.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order marked printing
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{orderId}/ready:
+    patch:
+      tags: [Orders]
+      summary: Mark as ready (vendor)
+      description: |
+        Vendor marks order as "ready for pickup".
+        Triggers notification to customer.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{orderId}/complete:
+    patch:
+      tags: [Orders]
+      summary: Complete order (customer)
+      description: Customer confirms order completed and leaves rating.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  example: 4
+      responses:
+        '200':
+          description: Order completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{orderId}/cancel:
+    patch:
+      tags: [Orders]
+      summary: Cancel order (customer)
+      description: |
+        Customer cancels order while status is "pending".
+        Refunds wallet balance. Triggers challenge progress check.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Order cancelled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Order'
+
+  /orders/{orderId}/keep:
+    patch:
+      tags: [Orders]
+      summary: Toggle keep file for future
+      description: |
+        Customer can opt to keep file for 7 days instead of 24 hours.
+        Useful for repeat prints.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                keep:
+                  type: boolean
+                  example: true
+      responses:
+        '200':
+          description: File retention updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  keepForFuture:
+                    type: boolean
+
+  # ==================== WALLET ====================
+  /wallet/:
+    get:
+      tags: [Wallet]
+      summary: Get wallet with transactions
+      description: Returns wallet balance, promo balance, and transaction history.
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+      responses:
+        '200':
+          description: Wallet data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance:
+                    type: number
+                    description: Real balance (₹)
+                  promoBalance:
+                    type: number
+                    description: Promo balance (expiry applies)
+                  transactions:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Transaction'
+                  pagination:
+                    $ref: '#/components/schemas/Pagination'
+
+  /wallet/balance:
+    get:
+      tags: [Wallet]
+      summary: Get balance only
+      description: Returns quick balance check (balance + promoBalance).
+      security:
+        - cookieAuth: []
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  balance:
+                    type: number
+                  promoBalance:
+                    type: number
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        _id:
+          type: string
+        fullName:
+          type: string
+        email:
+          type: string
+        phone:
+          type: string
+        role:
+          type: string
+          enum: [user, vendor, admin]
+        referralCode:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+
+    Vendor:
+      type: object
+      properties:
+        _id:
+          type: string
+        userId:
+          type: object
+          properties:
+            _id:
+              type: string
+            fullName:
+              type: string
+            phone:
+              type: string
+        shopName:
+          type: string
+        shopAddress:
+          type: string
+        shopPhoto:
+          type: string
+        location:
+          type: object
+          properties:
+            type:
+              type: string
+              example: "Point"
+            coordinates:
+              type: array
+              items:
+                type: number
+        pricing:
+          $ref: '#/components/schemas/Pricing'
+        isOpen:
+          type: boolean
+        status:
+          type: string
+          enum: [pending_approval, active, suspended, permanent_review]
+        plan:
+          type: string
+          enum: [trial, starter, growth, premium]
+        slaMinutes:
+          type: integer
+        strikes:
+          type: integer
+        averageRating:
+          type: number
+        totalOrders:
+          type: integer
+        completedOrders:
+          type: integer
+
+    Pricing:
+      type: object
+      properties:
+        A4:
+          type: object
+          properties:
+            bw_single:
+              type: number
+            bw_double:
+              type: number
+            color_single:
+              type: number
+            color_double:
+              type: number
+        A3:
+          type: object
+          properties:
+            bw_single:
+              type: number
+            bw_double:
+              type: number
+            color_single:
+              type: number
+            color_double:
+              type: number
+        Legal:
+          type: object
+          properties:
+            bw_single:
+              type: number
+            bw_double:
+              type: number
+            color_single:
+              type: number
+            color_double:
+              type: number
+
+    Order:
+      type: object
+      properties:
+        _id:
+          type: string
+        customerId:
+          type: string
+        vendorId:
+          type: string
+        fileName:
+          type: string
+        fileUrl:
+          type: string
+        previewUrl:
+          type: string
+        pageCount:
+          type: integer
+        fileSizeBytes:
+          type: integer
+        printConfig:
+          type: object
+          properties:
+            paperSize:
+              type: string
+              enum: [A4, A3, Legal]
+            printType:
+              type: string
+              enum: [bw_single, bw_double, color_single, color_double]
+            copies:
+              type: integer
+        printCost:
+          type: number
+        platformFee:
+          type: number
+        totalAmount:
+          type: number
+        pickupToken:
+          type: string
+          description: 4-digit unique pickup code
+        status:
+          type: string
+          enum: [pending, accepted, printing, ready, completed, rejected, cancelled]
+        slaDeadline:
+          type: string
+          format: date-time
+        statusHistory:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              timestamp:
+                type: string
+                format: date-time
+        customerNotes:
+          type: string
+        vendorNotes:
+          type: string
+        keepForFuture:
+          type: boolean
+        rating:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    Transaction:
+      type: object
+      properties:
+        _id:
+          type: string
+        type:
+          type: string
+          enum: [credit, debit]
+        amount:
+          type: number
+        source:
+          type: string
+          enum: [referral, challenge, spin_win, order_refund, order_payment, spin_cost, topup, signup_bonus, subscription_refund]
+        description:
+          type: string
+        relatedOrderId:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+        balanceAfter:
+          type: number
+        createdAt:
+          type: string
+          format: date-time
+
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        user:
+          $ref: '#/components/schemas/User'
+        accessToken:
+          type: string
+          description: JWT access token
+        refreshToken:
+          type: string
+          description: JWT refresh token
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+        limit:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: accessToken
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
